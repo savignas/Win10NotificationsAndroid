@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Win10Notifications</string>
+    <string name="large_text">
+        "Received notifications:"\n\n
+    </string>
+    <string name="action_settings">Settings</string>
+</resources>
