@@ -4,6 +4,7 @@ import android.app.NotificationManager;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.support.v4.app.FragmentTransaction;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.NotificationCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
@@ -11,6 +12,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 
 import static android.graphics.Color.BLUE;
+import static android.graphics.Color.WHITE;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -53,13 +55,12 @@ public class MainActivity extends AppCompatActivity {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this);
         builder.setSmallIcon(R.mipmap.ic_launcher);
         builder.setAutoCancel(true);
-        builder.setLargeIcon(BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher));
         builder.setContentTitle(deviceName);
         builder.setContentText(message);
-        builder.setColor(BLUE);
+        builder.setColor(ContextCompat.getColor(this, R.color.colorPrimaryDark));
+        builder.setLights(WHITE, 1000, 1000);
         NotificationManager notificationManager = (NotificationManager) getSystemService(
                 NOTIFICATION_SERVICE);
         notificationManager.notify(NOTIFICATION_ID, builder.build());
     }
-
 }
