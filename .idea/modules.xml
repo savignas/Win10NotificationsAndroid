@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/Win10Notifications.iml" filepath="$PROJECT_DIR$/Win10Notifications.iml" />
+      <module fileurl="file://$PROJECT_DIR$/Win10NotificationsAndroid.iml" filepath="$PROJECT_DIR$/Win10NotificationsAndroid.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
     </modules>
   </component>
