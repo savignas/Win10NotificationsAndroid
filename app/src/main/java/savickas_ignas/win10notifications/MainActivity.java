@@ -16,8 +16,6 @@ import static android.graphics.Color.WHITE;
 
 public class MainActivity extends AppCompatActivity {
 
-    public static final int NOTIFICATION_ID = 1;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -51,16 +49,16 @@ public class MainActivity extends AppCompatActivity {
     /**
      * Send a sample notification using the NotificationCompat API.
      */
-    public void sendNotification(String deviceName, String message) {
+    public void sendNotification(String appName, int notificationId, String notification) {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this);
         builder.setSmallIcon(R.mipmap.ic_launcher);
         builder.setAutoCancel(true);
-        builder.setContentTitle(deviceName);
-        builder.setContentText(message);
+        builder.setContentTitle(appName);
+        builder.setContentText(notification);
         builder.setColor(ContextCompat.getColor(this, R.color.colorPrimaryDark));
         builder.setLights(WHITE, 1000, 1000);
         NotificationManager notificationManager = (NotificationManager) getSystemService(
                 NOTIFICATION_SERVICE);
-        notificationManager.notify(NOTIFICATION_ID, builder.build());
+        notificationManager.notify(notificationId, builder.build());
     }
 }

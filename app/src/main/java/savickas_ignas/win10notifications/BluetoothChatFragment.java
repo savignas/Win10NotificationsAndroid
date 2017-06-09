@@ -29,7 +29,6 @@ public class BluetoothChatFragment extends Fragment {
 
     // Intent request codes
     private static final int REQUEST_CONNECT_DEVICE_SECURE = 1;
-    private static final int REQUEST_CONNECT_DEVICE_INSECURE = 2;
     private static final int REQUEST_ENABLE_BT = 3;
 
     // Layout Views
@@ -145,7 +144,7 @@ public class BluetoothChatFragment extends Fragment {
                 // Send a message using content of the edit text widget
                 View view = getView();
                 if (null != view) {
-                    ((MainActivity) getActivity()).sendNotification("TEST", "test");
+                    ((MainActivity) getActivity()).sendNotification("TEST", 1, "test");
 
                 }
             }
@@ -251,8 +250,9 @@ public class BluetoothChatFragment extends Fragment {
                     byte[] readBuf = (byte[]) msg.obj;
                     // construct a string from the valid bytes in the buffer
                     String readMessage = new String(readBuf, 0, msg.arg1);
+                    String[] messageParts = readMessage.split(";");
                     mConversationArrayAdapter.add(mConnectedDeviceName + ":  " + readMessage);
-                    ((MainActivity) getActivity()).sendNotification(mConnectedDeviceName, readMessage);
+                    ((MainActivity) getActivity()).sendNotification(messageParts[1], Integer.parseInt(messageParts[2]), messageParts[3]);
                     break;
                 case Constants.MESSAGE_DEVICE_NAME:
                     // save the connected device's name
