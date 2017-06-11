@@ -16,12 +16,16 @@ import static android.graphics.Color.WHITE;
 
 public class MainActivity extends AppCompatActivity {
 
+    private NotificationManager notificationManager;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+        notificationManager = (NotificationManager) getSystemService(
+                NOTIFICATION_SERVICE);
 
         if (savedInstanceState == null) {
             FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
@@ -49,7 +53,7 @@ public class MainActivity extends AppCompatActivity {
     /**
      * Send a sample notification using the NotificationCompat API.
      */
-    public void sendNotification(String appName, int notificationId, String notification) {
+    public void showNotification(String appName, int notificationId, String notification) {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this);
         builder.setSmallIcon(R.mipmap.ic_launcher);
         builder.setAutoCancel(true);
@@ -57,8 +61,13 @@ public class MainActivity extends AppCompatActivity {
         builder.setContentText(notification);
         builder.setColor(ContextCompat.getColor(this, R.color.colorPrimaryDark));
         builder.setLights(WHITE, 1000, 1000);
-        NotificationManager notificationManager = (NotificationManager) getSystemService(
-                NOTIFICATION_SERVICE);
         notificationManager.notify(notificationId, builder.build());
+    }
+
+    /**
+     * Send a sample notification using the NotificationCompat API.
+     */
+    public void cancelNotification(int notificationId) {
+        notificationManager.cancel(notificationId);
     }
 }

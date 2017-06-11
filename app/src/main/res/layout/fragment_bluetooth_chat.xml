@@ -22,6 +22,11 @@
             android:layout_height="wrap_content"
             android:text="@string/test" />
         <Button
+            android:id="@+id/button_cancel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/cancel" />
+        <Button
             android:id="@+id/button_send_test"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

@@ -22,6 +22,8 @@ import android.widget.Button;
 import android.widget.ListView;
 import android.widget.Toast;
 
+import java.util.Objects;
+
 /**
  * This fragment controls Bluetooth to communicate with other devices.
  */
@@ -35,6 +37,7 @@ public class BluetoothChatFragment extends Fragment {
     private ListView mConversationView;
     private Button mTestButton;
     private Button mTestSendButton;
+    private Button mCancelButton;
 
     /**
      * Name of the connected device
@@ -125,6 +128,7 @@ public class BluetoothChatFragment extends Fragment {
     public void onViewCreated(View view, @Nullable Bundle savedInstanceState) {
         mConversationView = (ListView) view.findViewById(R.id.in);
         mTestButton = (Button) view.findViewById(R.id.button_test);
+        mCancelButton = (Button) view.findViewById(R.id.button_cancel);
         mTestSendButton = (Button) view.findViewById(R.id.button_send_test);
     }
 
@@ -144,7 +148,19 @@ public class BluetoothChatFragment extends Fragment {
                 // Send a message using content of the edit text widget
                 View view = getView();
                 if (null != view) {
-                    ((MainActivity) getActivity()).sendNotification("TEST", 1, "test");
+                    ((MainActivity) getActivity()).showNotification("TEST", 1, "test");
+
+                }
+            }
+        });
+
+        // Initialize the send button with a listener that for click events
+        mCancelButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                // Send a message using content of the edit text widget
+                View view = getView();
+                if (null != view) {
+                    ((MainActivity) getActivity()).cancelNotification(1);
 
                 }
             }
@@ -244,7 +260,7 @@ public class BluetoothChatFragment extends Fragment {
                     byte[] writeBuf = (byte[]) msg.obj;
                     // construct a string from the buffer
                     String writeMessage = new String(writeBuf);
-                    mConversationArrayAdapter.add("Me:  " + writeMessage);
+                    mConversationArrayAdapter.add("Me: " + writeMessage);
                     break;
                 case Constants.MESSAGE_READ:
                     byte[] readBuf = (byte[]) msg.obj;
@@ -252,7 +268,14 @@ public class BluetoothChatFragment extends Fragment {
                     String readMessage = new String(readBuf, 0, msg.arg1);
                     String[] messageParts = readMessage.split(";");
                     mConversationArrayAdapter.add(mConnectedDeviceName + ":  " + readMessage);
-                    ((MainActivity) getActivity()).sendNotification(messageParts[1], Integer.parseInt(messageParts[2]), messageParts[3]);
+                    if (Objects.equals(messageParts[0], "1"))
+                    {
+                        ((MainActivity) getActivity()).showNotification(messageParts[2], Integer.parseInt(messageParts[1]), messageParts[3]);
+                    }
+                    else
+                    {
+                        ((MainActivity) getActivity()).cancelNotification(Integer.parseInt(messageParts[1]));
+                    }
                     break;
                 case Constants.MESSAGE_DEVICE_NAME:
                     // save the connected device's name
