@@ -330,7 +330,14 @@ public class BluetoothChatService {
          */
         public void write(byte[] buffer) {
             try {
-                mmOutStream.write(buffer);
+                int bufferLength = buffer.length;
+                byte[] newBuffer = new byte[bufferLength + 1];
+                newBuffer[0] = (byte) bufferLength;
+                for (int i = 0; i < bufferLength; i++)
+                {
+                    newBuffer[i+1] = buffer[i];
+                }
+                mmOutStream.write(newBuffer);
 
                 // Share the sent message back to the UI Activity
                 mHandler.obtainMessage(Constants.MESSAGE_WRITE, -1, -1, buffer)

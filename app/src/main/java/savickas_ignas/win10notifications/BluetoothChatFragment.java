@@ -267,7 +267,7 @@ public class BluetoothChatFragment extends Fragment {
                     // construct a string from the valid bytes in the buffer
                     String readMessage = new String(readBuf, 0, msg.arg1);
                     String[] messageParts = readMessage.split(";");
-                    mConversationArrayAdapter.add(mConnectedDeviceName + ":  " + readMessage);
+                    mConversationArrayAdapter.add(mConnectedDeviceName + ": " + readMessage);
                     if (Objects.equals(messageParts[0], "1"))
                     {
                         ((MainActivity) getActivity()).showNotification(messageParts[2], Integer.parseInt(messageParts[1]), messageParts[3]);
