@@ -27,6 +27,9 @@
             android:configChanges="orientation|keyboardHidden"
             android:label="@string/select_device"
             android:theme="@android:style/Theme.Holo.Dialog" />
+        <receiver android:name=".NotificationDismissedReceiver"
+            android:enabled="true"
+            android:exported="false" />
     </application>
 
 </manifest>
