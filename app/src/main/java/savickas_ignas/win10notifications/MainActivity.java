@@ -77,7 +77,7 @@ public class MainActivity extends AppCompatActivity {
     public void showNotification(String appName, int notificationId, String notification) {
         Intent intent = new Intent(this, NotificationDismissedReceiver.class);
         intent.putExtra("notificationId", notificationId);
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, intent, 0);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, notificationId, intent, 0);
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this);
         builder.setSmallIcon(R.mipmap.ic_launcher);
         builder.setContentTitle(appName);
