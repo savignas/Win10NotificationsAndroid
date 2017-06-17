@@ -23,6 +23,7 @@ public class MainActivity extends AppCompatActivity {
 
     private NotificationManager notificationManager;
     private BluetoothChatFragment fragment;
+    private Intent intent;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,6 +34,8 @@ public class MainActivity extends AppCompatActivity {
         notificationManager = (NotificationManager) getSystemService(
                 NOTIFICATION_SERVICE);
         registerReceiver(broadcastReceiver, new IntentFilter("NOTIFICATION_DELETED"));
+        intent = new Intent(this, ForegroundService.class);
+        startService(intent);
 
         if (savedInstanceState == null) {
             FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();

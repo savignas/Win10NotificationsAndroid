@@ -6,6 +6,7 @@
     <string name="test">Test</string>
     <string name="cancel">Cancel</string>
     <string name="test_send">Send</string>
+    <string name="service">Service</string>
     <string name="not_connected">You are not connected to a device</string>
     <string name="bt_not_enabled_leaving">Bluetooth was not enabled. Exiting app.</string>
     <string name="bt_not_enabled">Bluetooth was not enabled.</string>

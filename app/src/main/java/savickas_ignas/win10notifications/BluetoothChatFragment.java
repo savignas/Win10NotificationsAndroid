@@ -38,6 +38,8 @@ public class BluetoothChatFragment extends Fragment {
     private Button mTestButton;
     private Button mTestSendButton;
     private Button mCancelButton;
+    private Button mServiceButton;
+    private Intent mIntent;
 
     /**
      * Name of the connected device
@@ -70,6 +72,7 @@ public class BluetoothChatFragment extends Fragment {
         setHasOptionsMenu(true);
         // Get local Bluetooth adapter
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        mIntent = new Intent(getActivity(), ForegroundService.class);
 
         // If the adapter is null, then Bluetooth is not supported
         if (mBluetoothAdapter == null) {
@@ -134,6 +137,7 @@ public class BluetoothChatFragment extends Fragment {
         mTestButton = (Button) view.findViewById(R.id.button_test);
         mCancelButton = (Button) view.findViewById(R.id.button_cancel);
         mTestSendButton = (Button) view.findViewById(R.id.button_send_test);
+        mServiceButton = (Button) view.findViewById(R.id.button_service);
     }
 
     /**
@@ -177,6 +181,15 @@ public class BluetoothChatFragment extends Fragment {
                 View view = getView();
                 if (null != view) {
                     sendMessage("TESTAS");
+                }
+            }
+        });
+
+        mServiceButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                View  view = getView();
+                if (null != view) {
+                    getActivity().startService(mIntent);
                 }
             }
         });
@@ -294,11 +307,11 @@ public class BluetoothChatFragment extends Fragment {
                     mConversationArrayAdapter.add(mConnectedDeviceName + ": " + readMessage);
                     if (Objects.equals(messageParts[0], "1"))
                     {
-                        ((MainActivity) getActivity()).showNotification(messageParts[2], Integer.parseInt(messageParts[1]), messageParts[3]);
+                        ((MainActivity) activity).showNotification(messageParts[2], Integer.parseInt(messageParts[1]), messageParts[3]);
                     }
                     else
                     {
-                        ((MainActivity) getActivity()).cancelNotification(Integer.parseInt(messageParts[1]));
+                        ((MainActivity) activity).cancelNotification(Integer.parseInt(messageParts[1]));
                     }
                     break;
                 case Constants.MESSAGE_DEVICE_NAME:
@@ -337,7 +350,6 @@ public class BluetoothChatFragment extends Fragment {
                     Toast.makeText(getActivity(), R.string.bt_not_enabled,
                             Toast.LENGTH_SHORT).show();
                     setupChat(false);
-                    //getActivity().finish();
                 }
         }
     }
