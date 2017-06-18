@@ -3,7 +3,9 @@ package savickas_ignas.win10notifications;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -31,6 +33,7 @@ public class BluetoothChatFragment extends Fragment {
 
     // Intent request codes
     private static final int REQUEST_CONNECT_DEVICE_SECURE = 1;
+    private static final int REQUEST_SELECT_DEFAULT_DEVICE = 2;
     private static final int REQUEST_ENABLE_BT = 3;
 
     // Layout Views
@@ -40,6 +43,7 @@ public class BluetoothChatFragment extends Fragment {
     private Button mCancelButton;
     private Button mServiceButton;
     private Intent mIntent;
+    private Menu menu;
 
     /**
      * Name of the connected device
@@ -240,7 +244,6 @@ public class BluetoothChatFragment extends Fragment {
         }
         else {
             Toast.makeText(getActivity(), R.string.bt_not_enabled, Toast.LENGTH_SHORT).show();
-            return;
         }
     }
 
@@ -332,12 +335,31 @@ public class BluetoothChatFragment extends Fragment {
         }
     };
 
+    private void getAddress(Intent intent)
+    {
+        String address = intent.getStringExtra(DeviceListActivity.EXTRA_DEVICE_ADDRESS);
+        String name = intent.getStringExtra(DeviceListActivity.EXTRA_DEVICE_NAME);
+        SharedPreferences sharedPreferences = getActivity().getPreferences(Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putString("DEVICE_ADDRESS", address);
+        editor.putString("DEVICE_NAME", name);
+        editor.apply();
+        MenuItem item = menu.findItem(R.id.secure_connect);
+        item.setTitle(getString(R.string.secure_conncet_to, name));
+    }
+
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         switch (requestCode) {
-            case REQUEST_CONNECT_DEVICE_SECURE:
-                // When DeviceListActivity returns with a device to connect
+            case REQUEST_SELECT_DEFAULT_DEVICE:
+                // When DeviceListActivity returns with a default device to connect
                 if (resultCode == Activity.RESULT_OK) {
-                    connectDevice(data);
+                    getAddress(data);
+                }
+                break;
+            case REQUEST_CONNECT_DEVICE_SECURE:
+                if (resultCode == Activity.RESULT_OK) {
+                    getAddress(data);
+                    connectDevice();
                 }
                 break;
             case REQUEST_ENABLE_BT:
@@ -356,13 +378,16 @@ public class BluetoothChatFragment extends Fragment {
 
     /**
      * Establish connection with other divice
-     *
-     * @param data   An {@link Intent} with {@link DeviceListActivity#EXTRA_DEVICE_ADDRESS} extra.
      */
-    private void connectDevice(Intent data) {
+    private void connectDevice() {
         // Get the device MAC address
-        String address = data.getExtras()
-                .getString(DeviceListActivity.EXTRA_DEVICE_ADDRESS);
+        SharedPreferences sharedPreferences = getActivity().getPreferences(Context.MODE_PRIVATE);
+        String address = sharedPreferences.getString("DEVICE_ADDRESS", "");
+        if (Objects.equals(address, "")) {
+            Intent defaultIntent = new Intent(getActivity(), DeviceListActivity.class);
+            startActivityForResult(defaultIntent, REQUEST_CONNECT_DEVICE_SECURE);
+            return;
+        }
         // Get the BluetoothDevice object
         BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(address);
         // Attempt to connect to the device
@@ -371,27 +396,34 @@ public class BluetoothChatFragment extends Fragment {
 
     @Override
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+        this.menu = menu;
         inflater.inflate(R.menu.bluetooth_chat, menu);
+        SharedPreferences sharedPreferences = getActivity().getPreferences(Context.MODE_PRIVATE);
+        String name = sharedPreferences.getString("DEVICE_NAME", "");
+        if (!Objects.equals(name, "")) {
+            MenuItem item = menu.findItem(R.id.secure_connect);
+            item.setTitle(getString(R.string.secure_conncet_to, name));
+        }
         if (mBluetoothAdapter == null) {
-            MenuItem item = menu.findItem(R.id.secure_connect_scan);
-            item.setEnabled(false);
-            item = menu.findItem(R.id.discoverable);
-            item.setEnabled(false);
+            menu.setGroupEnabled(0, false);
         }
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
-            case R.id.secure_connect_scan: {
-                // Launch the DeviceListActivity to see devices and do scan
-                Intent serverIntent = new Intent(getActivity(), DeviceListActivity.class);
-                startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE_SECURE);
+            case R.id.secure_connect: {
+                connectDevice();
                 return true;
             }
             case R.id.discoverable: {
                 // Ensure this device is discoverable by others
                 ensureDiscoverable();
+                return true;
+            }
+            case R.id.select_default: {
+                Intent defaultIntent = new Intent(getActivity(), DeviceListActivity.class);
+                startActivityForResult(defaultIntent, REQUEST_SELECT_DEFAULT_DEVICE);
                 return true;
             }
         }
