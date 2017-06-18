@@ -60,6 +60,7 @@ public class ForegroundService extends Service {
                 .setContentIntent(pendingIntent)
                 .setTicker(getText(R.string.app_name))
                 .setOngoing(true)
+                .setPriority(Notification.PRIORITY_MIN)
                 .build();
 
         startForeground(30000, notification);

@@ -1,5 +1,6 @@
 package savickas_ignas.win10notifications;
 
+import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
@@ -77,7 +78,7 @@ public class MainActivity extends AppCompatActivity {
     /**
      * Send a sample notification using the NotificationCompat API.
      */
-    public void showNotification(String appName, int notificationId, String notification) {
+    public void showNotification(String appName, int notificationId, String notification, boolean onGoing, int priority) {
         Intent intent = new Intent(this, NotificationDismissedReceiver.class);
         intent.putExtra("notificationId", notificationId);
         PendingIntent pendingIntent = PendingIntent.getBroadcast(this, notificationId, intent, 0);
@@ -89,6 +90,8 @@ public class MainActivity extends AppCompatActivity {
         builder.setColor(ContextCompat.getColor(this, R.color.colorPrimaryDark));
         builder.setLights(WHITE, 1000, 1000);
         builder.setAutoCancel(true);
+        builder.setOngoing(onGoing);
+        builder.setPriority(priority);
         notificationManager.notify(notificationId, builder.build());
     }
 

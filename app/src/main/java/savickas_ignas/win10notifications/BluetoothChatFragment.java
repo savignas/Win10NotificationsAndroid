@@ -1,6 +1,7 @@
 package savickas_ignas.win10notifications;
 
 import android.app.Activity;
+import android.app.Notification;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.Context;
@@ -160,7 +161,7 @@ public class BluetoothChatFragment extends Fragment {
                 // Send a message using content of the edit text widget
                 View view = getView();
                 if (null != view) {
-                    ((MainActivity) getActivity()).showNotification("TEST", 1, "test");
+                    ((MainActivity) getActivity()).showNotification("TEST", 1, "test", false, Notification.PRIORITY_DEFAULT);
 
                 }
             }
@@ -285,14 +286,17 @@ public class BluetoothChatFragment extends Fragment {
                     switch (msg.arg1) {
                         case BluetoothChatService.STATE_CONNECTED:
                             setStatus(getString(R.string.title_connected_to, mConnectedDeviceName));
+                            ((MainActivity) activity).showNotification(getString(R.string.app_name), 2, getString(R.string.title_connected_to, mConnectedDeviceName), true, Notification.PRIORITY_MIN);
                             mConversationArrayAdapter.clear();
                             break;
                         case BluetoothChatService.STATE_CONNECTING:
                             setStatus(R.string.title_connecting);
+                            ((MainActivity) activity).showNotification(getString(R.string.app_name), 2, getString(R.string.title_connecting), true, Notification.PRIORITY_MIN);
                             break;
                         case BluetoothChatService.STATE_LISTEN:
                         case BluetoothChatService.STATE_NONE:
                             setStatus(R.string.title_not_connected);
+                            ((MainActivity) activity).showNotification(getString(R.string.app_name), 2, getString(R.string.title_not_connected), true, Notification.PRIORITY_MIN);
                             break;
                     }
                     break;
@@ -310,7 +314,7 @@ public class BluetoothChatFragment extends Fragment {
                     mConversationArrayAdapter.add(mConnectedDeviceName + ": " + readMessage);
                     if (Objects.equals(messageParts[0], "1"))
                     {
-                        ((MainActivity) activity).showNotification(messageParts[2], Integer.parseInt(messageParts[1]), messageParts[3]);
+                        ((MainActivity) activity).showNotification(messageParts[2], Integer.parseInt(messageParts[1]), messageParts[3], false, Notification.PRIORITY_DEFAULT);
                     }
                     else
                     {
