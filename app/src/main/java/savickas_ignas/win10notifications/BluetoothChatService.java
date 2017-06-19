@@ -4,19 +4,30 @@ package savickas_ignas.win10notifications;
  * Created by isavi on 2017-02-06.
  */
 
+import android.app.Notification;
+import android.app.PendingIntent;
+import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
+import android.bluetooth.le.BluetoothLeAdvertiser;
+import android.content.Intent;
+import android.os.Binder;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.IBinder;
+import android.os.Looper;
 import android.os.Message;
+import android.os.Process;
+import android.widget.Toast;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.UUID;
 
-public class BluetoothChatService {
+public class BluetoothChatService extends Service {
 
     // Unique UUID for this application
     private static final UUID MY_UUID_SECURE =
@@ -24,10 +35,12 @@ public class BluetoothChatService {
 
     // Member fields
     private final BluetoothAdapter mAdapter;
-    private final Handler mHandler;
+    //private final Handler mHandler;
     private ConnectThread mConnectThread;
     private ConnectedThread mConnectedThread;
     private int mState;
+    private Handler mHandler;
+    private final IBinder mIBinder = new LocalBinder();
 
     // Constants that indicate the current connection state
     public static final int STATE_NONE = 0;       // we're doing nothing
@@ -37,13 +50,30 @@ public class BluetoothChatService {
 
     /**
      * Constructor. Prepares a new BluetoothChat session.
-     *
-     * @param handler A Handler to send messages back to the UI Activity
      */
-    public BluetoothChatService(Handler handler) {
+    /*public BluetoothChatService(Handler handler) {
         mAdapter = BluetoothAdapter.getDefaultAdapter();
         mState = STATE_NONE;
         mHandler = handler;
+    }*/
+    public BluetoothChatService() {
+        mAdapter = BluetoothAdapter.getDefaultAdapter();
+        mState = STATE_NONE;
+    }
+
+    private final class ServiceHandler extends Handler {
+        public ServiceHandler(Looper looper) {
+            super(looper);
+        }
+        @Override
+        public void handleMessage(Message msg) {
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            stopSelf(msg.arg1);
+        }
     }
 
     /**
@@ -353,4 +383,68 @@ public class BluetoothChatService {
             }
         }
     }
+
+    @Override
+    public void onCreate() {
+        /*HandlerThread thread = new HandlerThread("ServiceStartArguments",
+                Process.THREAD_PRIORITY_FOREGROUND);
+        thread.start();
+
+        mServiceLooper = thread.getLooper();
+        mServiceHandler = new ServiceHandler(mServiceLooper)*/
+        super.onCreate();
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        Toast.makeText(this, "service starting", Toast.LENGTH_LONG).show();
+
+        /*Message msg = mServiceHandler.obtainMessage();
+        msg.arg1 = startId;
+        mServiceHandler.sendMessage(msg);*/
+
+        Intent notificationIntent = new Intent(this, MainActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
+
+        Notification notification = new Notification.Builder(this)
+                .setContentTitle(getText(R.string.app_name))
+                .setContentText("working")
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentIntent(pendingIntent)
+                .setTicker(getText(R.string.app_name))
+                .setPriority(Notification.PRIORITY_MIN)
+                .build();
+
+        startForeground(30000, notification);
+
+        return START_STICKY;
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return mIBinder;
+    }
+
+    @Override
+    public void onDestroy() {
+        Toast.makeText(this, "service done", Toast.LENGTH_LONG).show();
+        if (mHandler != null) {
+            mHandler = null;
+        }
+    }
+
+    public class LocalBinder extends Binder
+    {
+        public BluetoothChatService getInstance()
+        {
+            return BluetoothChatService.this;
+        }
+    }
+
+    public void setHandler(Handler handler)
+    {
+        mHandler = handler;
+    }
+
+
 }

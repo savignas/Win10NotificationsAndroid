@@ -24,7 +24,6 @@ public class MainActivity extends AppCompatActivity {
 
     private NotificationManager notificationManager;
     private BluetoothChatFragment fragment;
-    private Intent intent;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,8 +34,6 @@ public class MainActivity extends AppCompatActivity {
         notificationManager = (NotificationManager) getSystemService(
                 NOTIFICATION_SERVICE);
         registerReceiver(broadcastReceiver, new IntentFilter("NOTIFICATION_DELETED"));
-        intent = new Intent(this, ForegroundService.class);
-        startService(intent);
 
         if (savedInstanceState == null) {
             FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
@@ -65,9 +62,10 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         unregisterReceiver(broadcastReceiver);
+        cancelNotification(2);
     }
 
-    BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
+    private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             int notificationId = intent.getIntExtra("notificationId", 0);
@@ -78,20 +76,18 @@ public class MainActivity extends AppCompatActivity {
     /**
      * Send a sample notification using the NotificationCompat API.
      */
-    public void showNotification(String appName, int notificationId, String notification, boolean onGoing, int priority) {
+    public void showNotification(String appName, int notificationId, String notification) {
         Intent intent = new Intent(this, NotificationDismissedReceiver.class);
         intent.putExtra("notificationId", notificationId);
         PendingIntent pendingIntent = PendingIntent.getBroadcast(this, notificationId, intent, 0);
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this);
-        builder.setSmallIcon(R.mipmap.ic_launcher);
+        builder.setSmallIcon(R.drawable.ic_notification);
         builder.setContentTitle(appName);
         builder.setContentText(notification);
         builder.setDeleteIntent(pendingIntent);
-        builder.setColor(ContextCompat.getColor(this, R.color.colorPrimaryDark));
+        builder.setColor(ContextCompat.getColor(this, R.color.colorPrimary));
         builder.setLights(WHITE, 1000, 1000);
         builder.setAutoCancel(true);
-        builder.setOngoing(onGoing);
-        builder.setPriority(priority);
         notificationManager.notify(notificationId, builder.build());
     }
 
