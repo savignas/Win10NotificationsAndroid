@@ -62,7 +62,6 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         unregisterReceiver(broadcastReceiver);
-        cancelNotification(2);
     }
 
     private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {

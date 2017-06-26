@@ -16,7 +16,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal" >
 
-        <Button
+        <!--<Button
             android:id="@+id/button_test"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -25,12 +25,17 @@
             android:id="@+id/button_cancel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/cancel" />
+            android:text="@string/cancel" />-->
         <Button
             android:id="@+id/button_service"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/service"/>
+        <Button
+            android:id="@+id/button_service_stop"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/service_stop"/>
         <Button
             android:id="@+id/button_send_test"
             android:layout_width="match_parent"

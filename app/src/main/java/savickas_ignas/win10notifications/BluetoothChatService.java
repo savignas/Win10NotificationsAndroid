@@ -11,7 +11,9 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 import android.bluetooth.le.BluetoothLeAdvertiser;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.Handler;
@@ -20,6 +22,7 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
 import android.os.Process;
+import android.preference.PreferenceManager;
 import android.widget.Toast;
 
 import java.io.IOException;
@@ -40,7 +43,6 @@ public class BluetoothChatService extends Service {
     private ConnectedThread mConnectedThread;
     private int mState;
     private Handler mHandler;
-    private final IBinder mIBinder = new LocalBinder();
 
     // Constants that indicate the current connection state
     public static final int STATE_NONE = 0;       // we're doing nothing
@@ -59,21 +61,6 @@ public class BluetoothChatService extends Service {
     public BluetoothChatService() {
         mAdapter = BluetoothAdapter.getDefaultAdapter();
         mState = STATE_NONE;
-    }
-
-    private final class ServiceHandler extends Handler {
-        public ServiceHandler(Looper looper) {
-            super(looper);
-        }
-        @Override
-        public void handleMessage(Message msg) {
-            try {
-                Thread.sleep(5000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-            stopSelf(msg.arg1);
-        }
     }
 
     /**
@@ -386,65 +373,46 @@ public class BluetoothChatService extends Service {
 
     @Override
     public void onCreate() {
-        /*HandlerThread thread = new HandlerThread("ServiceStartArguments",
-                Process.THREAD_PRIORITY_FOREGROUND);
-        thread.start();
-
-        mServiceLooper = thread.getLooper();
-        mServiceHandler = new ServiceHandler(mServiceLooper)*/
         super.onCreate();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Toast.makeText(this, "service starting", Toast.LENGTH_LONG).show();
+        if (intent.getAction().equals(Constants.START_FOREGROUND)) {
+            Toast.makeText(this, "service starting", Toast.LENGTH_LONG).show();
+            SharedPreferences sharedPreferences = getSharedPreferences("DEVICE", Context.MODE_PRIVATE);
+            String name = sharedPreferences.getString("DEVICE_NAME", "No Default");
 
-        /*Message msg = mServiceHandler.obtainMessage();
-        msg.arg1 = startId;
-        mServiceHandler.sendMessage(msg);*/
+            Intent notificationIntent = new Intent(this, MainActivity.class);
+            PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
 
-        Intent notificationIntent = new Intent(this, MainActivity.class);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
+            Notification notification = new Notification.Builder(this)
+                    .setContentTitle(getText(R.string.app_name))
+                    .setContentText(name)
+                    .setSmallIcon(R.drawable.ic_notification)
+                    .setContentIntent(pendingIntent)
+                    .setTicker(getText(R.string.app_name))
+                    .setPriority(Notification.PRIORITY_MIN)
+                    .build();
 
-        Notification notification = new Notification.Builder(this)
-                .setContentTitle(getText(R.string.app_name))
-                .setContentText("working")
-                .setSmallIcon(R.drawable.ic_notification)
-                .setContentIntent(pendingIntent)
-                .setTicker(getText(R.string.app_name))
-                .setPriority(Notification.PRIORITY_MIN)
-                .build();
-
-        startForeground(30000, notification);
-
-        return START_STICKY;
+            startForeground(30000, notification);
+        }
+        else if (intent.getAction().equals(Constants.STOP_FOREGROUND)) {
+            Toast.makeText(this, "service stopped", Toast.LENGTH_LONG).show();
+            stopForeground(true);
+            stopSelf();
+        }
+        return START_NOT_STICKY;
     }
 
     @Override
     public IBinder onBind(Intent intent) {
-        return mIBinder;
+        return null;
     }
 
     @Override
     public void onDestroy() {
-        Toast.makeText(this, "service done", Toast.LENGTH_LONG).show();
-        if (mHandler != null) {
-            mHandler = null;
-        }
+        super.onDestroy();
     }
-
-    public class LocalBinder extends Binder
-    {
-        public BluetoothChatService getInstance()
-        {
-            return BluetoothChatService.this;
-        }
-    }
-
-    public void setHandler(Handler handler)
-    {
-        mHandler = handler;
-    }
-
 
 }

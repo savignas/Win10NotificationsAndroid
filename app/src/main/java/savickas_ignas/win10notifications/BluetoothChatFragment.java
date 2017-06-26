@@ -42,10 +42,11 @@ public class BluetoothChatFragment extends Fragment {
 
     // Layout Views
     private ListView mConversationView;
-    private Button mTestButton;
+    //private Button mTestButton;
     private Button mTestSendButton;
-    private Button mCancelButton;
+    //private Button mCancelButton;
     private Button mServiceButton;
+    private Button mServiceStopButton;
     private Menu menu;
 
     /**
@@ -72,24 +73,6 @@ public class BluetoothChatFragment extends Fragment {
      * Member object for the chat services
      */
     private BluetoothChatService mChatService = null;
-
-    private boolean mIsBound;
-
-    private ServiceConnection mConnection = new ServiceConnection() {
-        @Override
-        public void onServiceConnected(ComponentName componentName, IBinder iBinder)
-        {
-            mChatService = ((BluetoothChatService.LocalBinder)iBinder).getInstance();
-            mChatService.setHandler(mHandler);
-        }
-
-        @Override
-        public void onServiceDisconnected(ComponentName componentName)
-        {
-            mChatService = null;
-        }
-    };
-
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -131,13 +114,6 @@ public class BluetoothChatFragment extends Fragment {
         if (mChatService != null) {
             mChatService.stop();
         }
-        if (mIsBound)
-        {
-            // Detach our existing connection.
-            getActivity().unbindService(mConnection);
-            mIsBound = false;
-        }
-
     }
 
     @Override
@@ -165,10 +141,11 @@ public class BluetoothChatFragment extends Fragment {
     @Override
     public void onViewCreated(View view, @Nullable Bundle savedInstanceState) {
         mConversationView = (ListView) view.findViewById(R.id.in);
-        mTestButton = (Button) view.findViewById(R.id.button_test);
-        mCancelButton = (Button) view.findViewById(R.id.button_cancel);
+        //mTestButton = (Button) view.findViewById(R.id.button_test);
+        //mCancelButton = (Button) view.findViewById(R.id.button_cancel);
         mTestSendButton = (Button) view.findViewById(R.id.button_send_test);
         mServiceButton = (Button) view.findViewById(R.id.button_service);
+        mServiceStopButton = (Button) view.findViewById(R.id.button_service_stop);
     }
 
     /**
@@ -182,7 +159,7 @@ public class BluetoothChatFragment extends Fragment {
         mConversationView.setAdapter(mConversationArrayAdapter);
 
         // Initialize the send button with a listener that for click events
-        mTestButton.setOnClickListener(new View.OnClickListener() {
+        /*mTestButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 // Send a message using content of the edit text widget
                 View view = getView();
@@ -203,7 +180,7 @@ public class BluetoothChatFragment extends Fragment {
 
                 }
             }
-        });
+        });*/
 
         // Initialize the send button with a listener that for click events
         mTestSendButton.setOnClickListener(new View.OnClickListener() {
@@ -220,7 +197,20 @@ public class BluetoothChatFragment extends Fragment {
             public void onClick(View v) {
                 View  view = getView();
                 if (null != view) {
-                    //service
+                    Intent startIntent = new Intent(getActivity(), BluetoothChatService.class);
+                    startIntent.setAction(Constants.START_FOREGROUND);
+                    getActivity().startService(startIntent);
+                }
+            }
+        });
+
+        mServiceStopButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                View view = getView();
+                if (null != view) {
+                    Intent stopIntent = new Intent(getActivity(), BluetoothChatService.class);
+                    stopIntent.setAction(Constants.STOP_FOREGROUND);
+                    getActivity().startService(stopIntent);
                 }
             }
         });
@@ -228,10 +218,10 @@ public class BluetoothChatFragment extends Fragment {
         if (enabled) {
             // Initialize the BluetoothChatService to perform bluetooth connections
             //mChatService = new BluetoothChatService(mHandler);
-            Intent intent = new Intent(getActivity(), BluetoothChatService.class);
+            /*Intent intent = new Intent(getActivity(), BluetoothChatService.class);
             getActivity().startService(intent);
             getActivity().bindService(new Intent(getActivity(), BluetoothChatService.class), mConnection, Context.BIND_AUTO_CREATE);
-            mIsBound = true;
+            mIsBound = true;*/
 
         }
 
@@ -371,7 +361,7 @@ public class BluetoothChatFragment extends Fragment {
     {
         String address = intent.getStringExtra(DeviceListActivity.EXTRA_DEVICE_ADDRESS);
         String name = intent.getStringExtra(DeviceListActivity.EXTRA_DEVICE_NAME);
-        SharedPreferences sharedPreferences = getActivity().getPreferences(Context.MODE_PRIVATE);
+        SharedPreferences sharedPreferences = getActivity().getSharedPreferences("DEVICE", Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPreferences.edit();
         editor.putString("DEVICE_ADDRESS", address);
         editor.putString("DEVICE_NAME", name);
@@ -413,7 +403,7 @@ public class BluetoothChatFragment extends Fragment {
      */
     private void connectDevice() {
         // Get the device MAC address
-        SharedPreferences sharedPreferences = getActivity().getPreferences(Context.MODE_PRIVATE);
+        SharedPreferences sharedPreferences = getActivity().getSharedPreferences("DEVICE", Context.MODE_PRIVATE);
         String address = sharedPreferences.getString("DEVICE_ADDRESS", "");
         if (Objects.equals(address, "")) {
             Intent defaultIntent = new Intent(getActivity(), DeviceListActivity.class);
@@ -430,7 +420,7 @@ public class BluetoothChatFragment extends Fragment {
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
         this.menu = menu;
         inflater.inflate(R.menu.bluetooth_chat, menu);
-        SharedPreferences sharedPreferences = getActivity().getPreferences(Context.MODE_PRIVATE);
+        SharedPreferences sharedPreferences = getActivity().getSharedPreferences("DEVICE", Context.MODE_PRIVATE);
         String name = sharedPreferences.getString("DEVICE_NAME", "");
         if (!Objects.equals(name, "")) {
             MenuItem item = menu.findItem(R.id.secure_connect);
