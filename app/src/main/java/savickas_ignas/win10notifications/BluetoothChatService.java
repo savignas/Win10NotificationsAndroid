@@ -1,28 +1,17 @@
 package savickas_ignas.win10notifications;
 
-/**
- * Created by isavi on 2017-02-06.
- */
-
 import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
-import android.bluetooth.le.BluetoothLeAdvertiser;
-import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.HandlerThread;
 import android.os.IBinder;
-import android.os.Looper;
 import android.os.Message;
-import android.os.Process;
-import android.preference.PreferenceManager;
 import android.widget.Toast;
 
 import java.io.IOException;
@@ -38,11 +27,13 @@ public class BluetoothChatService extends Service {
 
     // Member fields
     private final BluetoothAdapter mAdapter;
-    //private final Handler mHandler;
     private ConnectThread mConnectThread;
     private ConnectedThread mConnectedThread;
     private int mState;
+    private int mNewState;
     private Handler mHandler;
+    private final IBinder mBinder = new MyBinder();
+    private String mConnectedDeviceName = null;
 
     // Constants that indicate the current connection state
     public static final int STATE_NONE = 0;       // we're doing nothing
@@ -53,26 +44,32 @@ public class BluetoothChatService extends Service {
     /**
      * Constructor. Prepares a new BluetoothChat session.
      */
-    /*public BluetoothChatService(Handler handler) {
-        mAdapter = BluetoothAdapter.getDefaultAdapter();
-        mState = STATE_NONE;
-        mHandler = handler;
-    }*/
     public BluetoothChatService() {
         mAdapter = BluetoothAdapter.getDefaultAdapter();
         mState = STATE_NONE;
+        mNewState = mState;
     }
 
-    /**
-     * Set the current state of the chat connection
-     *
-     * @param state An integer defining the current connection state
-     */
-    private synchronized void setState(int state) {
-        mState = state;
+    private synchronized void updateUserInterfaceTitle() {
+        mState = getState();
+        mNewState = mState;
 
-        // Give the new state to the Handler so the UI Activity can update
-        mHandler.obtainMessage(Constants.MESSAGE_STATE_CHANGE, state, -1).sendToTarget();
+        if (mHandler != null) {
+            // Give the new state to the Handler so the UI Activity can update
+            mHandler.obtainMessage(Constants.MESSAGE_STATE_CHANGE, mNewState, -1).sendToTarget();
+        }
+        switch (mNewState) {
+            case STATE_CONNECTED:
+                setForegroundNotification(getString(R.string.title_connected_to, mConnectedDeviceName));
+                break;
+            case STATE_CONNECTING:
+                setForegroundNotification(getString(R.string.title_connecting));
+                break;
+            case STATE_LISTEN:
+            case STATE_NONE:
+                setForegroundNotification(getString(R.string.title_not_connected));
+                break;
+        }
     }
 
     /**
@@ -100,7 +97,7 @@ public class BluetoothChatService extends Service {
             mConnectedThread = null;
         }
 
-        setState(STATE_LISTEN);
+        updateUserInterfaceTitle();
     }
 
     /**
@@ -127,7 +124,7 @@ public class BluetoothChatService extends Service {
         // Start the thread to connect with the given device
         mConnectThread = new ConnectThread(device);
         mConnectThread.start();
-        setState(STATE_CONNECTING);
+        updateUserInterfaceTitle();
     }
 
     /**
@@ -155,14 +152,18 @@ public class BluetoothChatService extends Service {
         mConnectedThread = new ConnectedThread(socket);
         mConnectedThread.start();
 
-        // Send the name of the connected device back to the UI Activity
-        Message msg = mHandler.obtainMessage(Constants.MESSAGE_DEVICE_NAME);
-        Bundle bundle = new Bundle();
-        bundle.putString(Constants.DEVICE_NAME, device.getName());
-        msg.setData(bundle);
-        mHandler.sendMessage(msg);
+        if (mHandler != null) {
+            // Send the name of the connected device back to the UI Activity
+            Message msg = mHandler.obtainMessage(Constants.MESSAGE_DEVICE_NAME);
+            Bundle bundle = new Bundle();
+            bundle.putString(Constants.DEVICE_NAME, device.getName());
+            msg.setData(bundle);
+            mHandler.sendMessage(msg);
+        }
 
-        setState(STATE_CONNECTED);
+        mConnectedDeviceName = device.getName();
+
+        updateUserInterfaceTitle();
     }
 
     /**
@@ -180,7 +181,9 @@ public class BluetoothChatService extends Service {
             mConnectedThread = null;
         }
 
-        setState(STATE_NONE);
+        mState = STATE_NONE;
+
+        updateUserInterfaceTitle();
     }
 
     /**
@@ -205,12 +208,17 @@ public class BluetoothChatService extends Service {
      * Indicate that the connection attempt failed and notify the UI Activity.
      */
     private void connectionFailed() {
-        // Send a failure message back to the Activity
-        Message msg = mHandler.obtainMessage(Constants.MESSAGE_TOAST);
-        Bundle bundle = new Bundle();
-        bundle.putString(Constants.TOAST, "Unable to connect device");
-        msg.setData(bundle);
-        mHandler.sendMessage(msg);
+        if (mHandler != null) {
+            // Send a failure message back to the Activity
+            Message msg = mHandler.obtainMessage(Constants.MESSAGE_TOAST);
+            Bundle bundle = new Bundle();
+            bundle.putString(Constants.TOAST, "Unable to connect device");
+            msg.setData(bundle);
+            mHandler.sendMessage(msg);
+        }
+
+        mState = STATE_NONE;
+        updateUserInterfaceTitle();
 
         // Start the service over to restart listening mode
         BluetoothChatService.this.start();
@@ -220,12 +228,17 @@ public class BluetoothChatService extends Service {
      * Indicate that the connection was lost and notify the UI Activity.
      */
     private void connectionLost() {
-        // Send a failure message back to the Activity
-        Message msg = mHandler.obtainMessage(Constants.MESSAGE_TOAST);
-        Bundle bundle = new Bundle();
-        bundle.putString(Constants.TOAST, "Device connection was lost");
-        msg.setData(bundle);
-        mHandler.sendMessage(msg);
+        if (mHandler != null) {
+            // Send a failure message back to the Activity
+            Message msg = mHandler.obtainMessage(Constants.MESSAGE_TOAST);
+            Bundle bundle = new Bundle();
+            bundle.putString(Constants.TOAST, "Device connection was lost");
+            msg.setData(bundle);
+            mHandler.sendMessage(msg);
+        }
+
+        mState = STATE_NONE;
+        updateUserInterfaceTitle();
 
         // Start the service over to restart listening mode
         BluetoothChatService.this.start();
@@ -239,9 +252,8 @@ public class BluetoothChatService extends Service {
     private class ConnectThread extends Thread {
         private final BluetoothSocket mmSocket;
         private final BluetoothDevice mmDevice;
-        private String mSocketType;
 
-        public ConnectThread(BluetoothDevice device) {
+        ConnectThread(BluetoothDevice device) {
             mmDevice = device;
             BluetoothSocket tmp = null;
 
@@ -250,13 +262,13 @@ public class BluetoothChatService extends Service {
             try {
                 tmp = device.createRfcommSocketToServiceRecord(
                         MY_UUID_SECURE);
-            } catch (IOException e) {
+            } catch (IOException ignored) {
             }
             mmSocket = tmp;
+            mState = STATE_CONNECTING;
         }
 
         public void run() {
-            setName("ConnectThread" + mSocketType);
 
             // Always cancel discovery because it will slow down a connection
             mAdapter.cancelDiscovery();
@@ -270,7 +282,7 @@ public class BluetoothChatService extends Service {
                 // Close the socket
                 try {
                     mmSocket.close();
-                } catch (IOException e2) {
+                } catch (IOException ignored) {
                 }
                 connectionFailed();
                 return;
@@ -285,10 +297,10 @@ public class BluetoothChatService extends Service {
             connected(mmSocket, mmDevice);
         }
 
-        public void cancel() {
+        void cancel() {
             try {
                 mmSocket.close();
-            } catch (IOException e) {
+            } catch (IOException ignored) {
             }
         }
     }
@@ -302,7 +314,7 @@ public class BluetoothChatService extends Service {
         private final InputStream mmInStream;
         private final OutputStream mmOutStream;
 
-        public ConnectedThread(BluetoothSocket socket) {
+        ConnectedThread(BluetoothSocket socket) {
             mmSocket = socket;
             InputStream tmpIn = null;
             OutputStream tmpOut = null;
@@ -311,11 +323,12 @@ public class BluetoothChatService extends Service {
             try {
                 tmpIn = socket.getInputStream();
                 tmpOut = socket.getOutputStream();
-            } catch (IOException e) {
+            } catch (IOException ignored) {
             }
 
             mmInStream = tmpIn;
             mmOutStream = tmpOut;
+            mState = STATE_CONNECTED;
         }
 
         public void run() {
@@ -328,13 +341,13 @@ public class BluetoothChatService extends Service {
                     // Read from the InputStream
                     bytes = mmInStream.read(buffer);
 
-                    // Send the obtained bytes to the UI Activity
-                    mHandler.obtainMessage(Constants.MESSAGE_READ, bytes, -1, buffer)
-                            .sendToTarget();
+                    if (mHandler != null) {
+                        // Send the obtained bytes to the UI Activity
+                        mHandler.obtainMessage(Constants.MESSAGE_READ, bytes, -1, buffer)
+                                .sendToTarget();
+                    }
                 } catch (IOException e) {
                     connectionLost();
-                    // Start the service over to restart listening mode
-                    BluetoothChatService.this.start();
                     break;
                 }
             }
@@ -345,30 +358,45 @@ public class BluetoothChatService extends Service {
          *
          * @param buffer The bytes to write
          */
-        public void write(byte[] buffer) {
+        void write(byte[] buffer) {
             try {
                 int bufferLength = buffer.length;
                 byte[] newBuffer = new byte[bufferLength + 1];
                 newBuffer[0] = (byte) bufferLength;
-                for (int i = 0; i < bufferLength; i++)
-                {
-                    newBuffer[i+1] = buffer[i];
-                }
+                System.arraycopy(buffer, 0, newBuffer, 1, bufferLength);
                 mmOutStream.write(newBuffer);
 
-                // Share the sent message back to the UI Activity
-                mHandler.obtainMessage(Constants.MESSAGE_WRITE, -1, -1, buffer)
-                        .sendToTarget();
-            } catch (IOException e) {
+                if (mHandler != null) {
+                    // Share the sent message back to the UI Activity
+                    mHandler.obtainMessage(Constants.MESSAGE_WRITE, -1, -1, buffer)
+                            .sendToTarget();
+                }
+            } catch (IOException ignored) {
             }
         }
 
-        public void cancel() {
+        void cancel() {
             try {
                 mmSocket.close();
-            } catch (IOException e) {
+            } catch (IOException ignored) {
             }
         }
+    }
+
+    public void setForegroundNotification(String contextText) {
+        Intent notificationIntent = new Intent(this, MainActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
+
+        Notification notification = new Notification.Builder(this)
+                .setContentTitle(getString(R.string.app_name))
+                .setContentText(contextText)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentIntent(pendingIntent)
+                .setTicker(getString(R.string.app_name))
+                .setPriority(Notification.PRIORITY_MIN)
+                .build();
+
+        startForeground(Constants.NOTIFICATION_ID, notification);
     }
 
     @Override
@@ -380,22 +408,10 @@ public class BluetoothChatService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent.getAction().equals(Constants.START_FOREGROUND)) {
             Toast.makeText(this, "service starting", Toast.LENGTH_LONG).show();
-            SharedPreferences sharedPreferences = getSharedPreferences("DEVICE", Context.MODE_PRIVATE);
-            String name = sharedPreferences.getString("DEVICE_NAME", "No Default");
+            /*SharedPreferences sharedPreferences = getSharedPreferences("DEVICE", Context.MODE_PRIVATE);
+            String name = sharedPreferences.getString("DEVICE_NAME", getString(R.string.title_not_connected));*/
 
-            Intent notificationIntent = new Intent(this, MainActivity.class);
-            PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
-
-            Notification notification = new Notification.Builder(this)
-                    .setContentTitle(getText(R.string.app_name))
-                    .setContentText(name)
-                    .setSmallIcon(R.drawable.ic_notification)
-                    .setContentIntent(pendingIntent)
-                    .setTicker(getText(R.string.app_name))
-                    .setPriority(Notification.PRIORITY_MIN)
-                    .build();
-
-            startForeground(30000, notification);
+            setForegroundNotification(getString(R.string.title_not_connected));
         }
         else if (intent.getAction().equals(Constants.STOP_FOREGROUND)) {
             Toast.makeText(this, "service stopped", Toast.LENGTH_LONG).show();
@@ -407,12 +423,24 @@ public class BluetoothChatService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
-        return null;
+        return mBinder;
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
+        if (mHandler != null) {
+            mHandler = null;
+        }
     }
 
+    class MyBinder extends Binder {
+        BluetoothChatService getService() {
+            return BluetoothChatService.this;
+        }
+    }
+
+    public void setHandler(Handler handler) {
+        mHandler = handler;
+    }
 }

@@ -1,7 +1,6 @@
 package savickas_ignas.win10notifications;
 
 import android.app.Activity;
-import android.app.Notification;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.ComponentName;
@@ -17,6 +16,7 @@ import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentActivity;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.app.ActionBar;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -33,7 +33,7 @@ import java.util.Objects;
 /**
  * This fragment controls Bluetooth to communicate with other devices.
  */
-public class BluetoothChatFragment extends Fragment {
+public class BluetoothChatFragment extends Fragment implements ServiceConnection {
 
     // Intent request codes
     private static final int REQUEST_CONNECT_DEVICE_SECURE = 1;
@@ -42,10 +42,7 @@ public class BluetoothChatFragment extends Fragment {
 
     // Layout Views
     private ListView mConversationView;
-    //private Button mTestButton;
     private Button mTestSendButton;
-    //private Button mCancelButton;
-    private Button mServiceButton;
     private Button mServiceStopButton;
     private Menu menu;
 
@@ -73,6 +70,8 @@ public class BluetoothChatFragment extends Fragment {
      * Member object for the chat services
      */
     private BluetoothChatService mChatService = null;
+
+    private boolean mIsBound;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -114,6 +113,10 @@ public class BluetoothChatFragment extends Fragment {
         if (mChatService != null) {
             mChatService.stop();
         }
+        if (mIsBound) {
+            getActivity().unbindService(this);
+            mIsBound = false;
+        }
     }
 
     @Override
@@ -141,11 +144,21 @@ public class BluetoothChatFragment extends Fragment {
     @Override
     public void onViewCreated(View view, @Nullable Bundle savedInstanceState) {
         mConversationView = (ListView) view.findViewById(R.id.in);
-        //mTestButton = (Button) view.findViewById(R.id.button_test);
-        //mCancelButton = (Button) view.findViewById(R.id.button_cancel);
         mTestSendButton = (Button) view.findViewById(R.id.button_send_test);
-        mServiceButton = (Button) view.findViewById(R.id.button_service);
         mServiceStopButton = (Button) view.findViewById(R.id.button_service_stop);
+    }
+
+    @Override
+    public void onServiceConnected(ComponentName name, IBinder binder) {
+        BluetoothChatService.MyBinder myBinder = (BluetoothChatService.MyBinder) binder;
+        mChatService = myBinder.getService();
+        mChatService.setHandler(mHandler);
+        mChatService.start();
+    }
+
+    @Override
+    public void onServiceDisconnected(ComponentName name) {
+        mChatService = null;
     }
 
     /**
@@ -159,47 +172,12 @@ public class BluetoothChatFragment extends Fragment {
         mConversationView.setAdapter(mConversationArrayAdapter);
 
         // Initialize the send button with a listener that for click events
-        /*mTestButton.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                // Send a message using content of the edit text widget
-                View view = getView();
-                if (null != view) {
-                    ((MainActivity) getActivity()).showNotification("TEST", 1, "test");
-
-                }
-            }
-        });
-
-        // Initialize the send button with a listener that for click events
-        mCancelButton.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                // Send a message using content of the edit text widget
-                View view = getView();
-                if (null != view) {
-                    ((MainActivity) getActivity()).cancelNotification(1);
-
-                }
-            }
-        });*/
-
-        // Initialize the send button with a listener that for click events
         mTestSendButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 // Send a message using content of the edit text widget
                 View view = getView();
                 if (null != view) {
                     sendMessage("TESTAS");
-                }
-            }
-        });
-
-        mServiceButton.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                View  view = getView();
-                if (null != view) {
-                    Intent startIntent = new Intent(getActivity(), BluetoothChatService.class);
-                    startIntent.setAction(Constants.START_FOREGROUND);
-                    getActivity().startService(startIntent);
                 }
             }
         });
@@ -211,18 +189,19 @@ public class BluetoothChatFragment extends Fragment {
                     Intent stopIntent = new Intent(getActivity(), BluetoothChatService.class);
                     stopIntent.setAction(Constants.STOP_FOREGROUND);
                     getActivity().startService(stopIntent);
+                    mIsBound = false;
                 }
             }
         });
 
         if (enabled) {
             // Initialize the BluetoothChatService to perform bluetooth connections
-            //mChatService = new BluetoothChatService(mHandler);
-            /*Intent intent = new Intent(getActivity(), BluetoothChatService.class);
-            getActivity().startService(intent);
-            getActivity().bindService(new Intent(getActivity(), BluetoothChatService.class), mConnection, Context.BIND_AUTO_CREATE);
-            mIsBound = true;*/
-
+            Intent startIntent = new Intent(getActivity(), BluetoothChatService.class);
+            startIntent.setAction(Constants.START_FOREGROUND);
+            getActivity().startService(startIntent);
+            getActivity().bindService(startIntent, BluetoothChatFragment.this, Context.BIND_AUTO_CREATE);
+            mIsBound = true;
+            //mChatService = new BluetoothChatService();
         }
 
         // Initialize the buffer for outgoing messages
@@ -279,7 +258,11 @@ public class BluetoothChatFragment extends Fragment {
         if (null == activity) {
             return;
         }
-        ((AppCompatActivity) getActivity()).getSupportActionBar().setSubtitle(resId);
+        final ActionBar actionBar = ((AppCompatActivity) activity).getSupportActionBar();
+        if (null == actionBar) {
+            return;
+        }
+        actionBar.setSubtitle(resId);
     }
 
     /**
@@ -292,7 +275,11 @@ public class BluetoothChatFragment extends Fragment {
         if (null == activity) {
             return;
         }
-        ((AppCompatActivity) getActivity()).getSupportActionBar().setSubtitle(subTitle);
+        final ActionBar actionBar = ((AppCompatActivity) activity).getSupportActionBar();
+        if (null == actionBar) {
+            return;
+        }
+        actionBar.setSubtitle(subTitle);
     }
 
     /**
@@ -367,7 +354,7 @@ public class BluetoothChatFragment extends Fragment {
         editor.putString("DEVICE_NAME", name);
         editor.apply();
         MenuItem item = menu.findItem(R.id.secure_connect);
-        item.setTitle(getString(R.string.secure_conncet_to, name));
+        item.setTitle(getString(R.string.secure_connect_to, name));
     }
 
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -424,7 +411,7 @@ public class BluetoothChatFragment extends Fragment {
         String name = sharedPreferences.getString("DEVICE_NAME", "");
         if (!Objects.equals(name, "")) {
             MenuItem item = menu.findItem(R.id.secure_connect);
-            item.setTitle(getString(R.string.secure_conncet_to, name));
+            item.setTitle(getString(R.string.secure_connect_to, name));
         }
         if (mBluetoothAdapter == null) {
             menu.setGroupEnabled(0, false);
