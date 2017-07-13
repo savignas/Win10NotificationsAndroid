@@ -16,7 +16,6 @@ public interface Constants {
     public static final String DEVICE_NAME = "device_name";
     public static final String TOAST = "toast";
 
-    public static final String START_FOREGROUND = "startforeground";
     public static final String STOP_FOREGROUND = "stopforeground";
 
     public static final int NOTIFICATION_ID = 30000;

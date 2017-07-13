@@ -110,13 +110,13 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (mChatService != null) {
+        /*if (mChatService != null) {
             mChatService.stop();
         }
         if (mIsBound) {
             getActivity().unbindService(this);
             mIsBound = false;
-        }
+        }*/
     }
 
     @Override
@@ -190,6 +190,10 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                     stopIntent.setAction(Constants.STOP_FOREGROUND);
                     getActivity().startService(stopIntent);
                     mIsBound = false;
+                    if (mChatService != null) {
+                        mChatService.stop();
+                    }
+                    getActivity().unbindService(BluetoothChatFragment.this);
                 }
             }
         });
@@ -197,11 +201,9 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
         if (enabled) {
             // Initialize the BluetoothChatService to perform bluetooth connections
             Intent startIntent = new Intent(getActivity(), BluetoothChatService.class);
-            startIntent.setAction(Constants.START_FOREGROUND);
             getActivity().startService(startIntent);
             getActivity().bindService(startIntent, BluetoothChatFragment.this, Context.BIND_AUTO_CREATE);
             mIsBound = true;
-            //mChatService = new BluetoothChatService();
         }
 
         // Initialize the buffer for outgoing messages
@@ -319,11 +321,11 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                     mConversationArrayAdapter.add(mConnectedDeviceName + ": " + readMessage);
                     if (Objects.equals(messageParts[0], "1"))
                     {
-                        ((MainActivity) activity).showNotification(messageParts[2], Integer.parseInt(messageParts[1]), messageParts[3]);
+                        mChatService.showNotification(messageParts[2], Integer.parseInt(messageParts[1]), messageParts[3]);
                     }
                     else
                     {
-                        ((MainActivity) activity).cancelNotification(Integer.parseInt(messageParts[1]));
+                        mChatService.cancelNotification(Integer.parseInt(messageParts[1]));
                     }
                     break;
                 case Constants.MESSAGE_DEVICE_NAME:

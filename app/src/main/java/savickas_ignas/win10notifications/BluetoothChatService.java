@@ -1,6 +1,7 @@
 package savickas_ignas.win10notifications;
 
 import android.app.Notification;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
@@ -12,12 +13,16 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
+import android.support.v4.content.ContextCompat;
+import android.support.v7.app.NotificationCompat;
 import android.widget.Toast;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.UUID;
+
+import static android.graphics.Color.WHITE;
 
 public class BluetoothChatService extends Service {
 
@@ -34,6 +39,7 @@ public class BluetoothChatService extends Service {
     private Handler mHandler;
     private final IBinder mBinder = new MyBinder();
     private String mConnectedDeviceName = null;
+    private NotificationManager notificationManager;
 
     // Constants that indicate the current connection state
     public static final int STATE_NONE = 0;       // we're doing nothing
@@ -85,16 +91,15 @@ public class BluetoothChatService extends Service {
      */
     public synchronized void start() {
 
-        // Cancel any thread attempting to make a connection
-        if (mConnectThread != null) {
-            mConnectThread.cancel();
-            mConnectThread = null;
-        }
-
-        // Cancel any thread currently running a connection
         if (mConnectedThread != null) {
-            mConnectedThread.cancel();
-            mConnectedThread = null;
+            if (mHandler != null) {
+                // Send the name of the connected device back to the UI Activity
+                Message msg = mHandler.obtainMessage(Constants.MESSAGE_DEVICE_NAME);
+                Bundle bundle = new Bundle();
+                bundle.putString(Constants.DEVICE_NAME, mConnectedDeviceName);
+                msg.setData(bundle);
+                mHandler.sendMessage(msg);
+            }
         }
 
         updateUserInterfaceTitle();
@@ -402,18 +407,18 @@ public class BluetoothChatService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        notificationManager = (NotificationManager) getSystemService(
+                NOTIFICATION_SERVICE);
+        Toast.makeText(this, "service starting", Toast.LENGTH_LONG).show();
+        /*SharedPreferences sharedPreferences = getSharedPreferences("DEVICE", Context.MODE_PRIVATE);
+        String name = sharedPreferences.getString("DEVICE_NAME", getString(R.string.title_not_connected));*/
+
+        setForegroundNotification(getString(R.string.title_not_connected));
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent.getAction().equals(Constants.START_FOREGROUND)) {
-            Toast.makeText(this, "service starting", Toast.LENGTH_LONG).show();
-            /*SharedPreferences sharedPreferences = getSharedPreferences("DEVICE", Context.MODE_PRIVATE);
-            String name = sharedPreferences.getString("DEVICE_NAME", getString(R.string.title_not_connected));*/
-
-            setForegroundNotification(getString(R.string.title_not_connected));
-        }
-        else if (intent.getAction().equals(Constants.STOP_FOREGROUND)) {
+        if (intent.getAction() != null && intent.getAction().equals(Constants.STOP_FOREGROUND)) {
             Toast.makeText(this, "service stopped", Toast.LENGTH_LONG).show();
             stopForeground(true);
             stopSelf();
@@ -442,5 +447,31 @@ public class BluetoothChatService extends Service {
 
     public void setHandler(Handler handler) {
         mHandler = handler;
+    }
+
+    /**
+     * Send a sample notification using the NotificationCompat API.
+     */
+    public void showNotification(String appName, int notificationId, String notification) {
+        /*Intent intent = new Intent(this, NotificationDismissedReceiver.class);
+        intent.putExtra("notificationId", notificationId);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, notificationId, intent, 0);*/
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this);
+        builder.setSmallIcon(R.drawable.ic_notification);
+        builder.setContentTitle(appName);
+        builder.setContentText(notification);
+        //builder.setDeleteIntent(pendingIntent);
+        builder.setColor(ContextCompat.getColor(this, R.color.colorPrimary));
+        builder.setLights(WHITE, 1000, 1000);
+        builder.setAutoCancel(true);
+        notificationManager.notify(notificationId, builder.build());
+        System.out.print("test");
+    }
+
+    /**
+     * Send a sample notification using the NotificationCompat API.
+     */
+    public void cancelNotification(int notificationId) {
+        notificationManager.cancel(notificationId);
     }
 }
