@@ -186,14 +186,16 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
             public void onClick(View v) {
                 View view = getView();
                 if (null != view) {
-                    Intent stopIntent = new Intent(getActivity(), BluetoothChatService.class);
-                    stopIntent.setAction(Constants.STOP_FOREGROUND);
-                    getActivity().startService(stopIntent);
-                    mIsBound = false;
                     if (mChatService != null) {
+                        Intent stopIntent = new Intent(getActivity(), BluetoothChatService.class);
+                        stopIntent.setAction(Constants.STOP_FOREGROUND);
+                        getActivity().startService(stopIntent);
+                        mIsBound = false;
                         mChatService.stop();
+                        getActivity().unbindService(BluetoothChatFragment.this);
+                        mChatService = null;
+                        menu.setGroupEnabled(0, false);
                     }
-                    getActivity().unbindService(BluetoothChatFragment.this);
                 }
             }
         });
@@ -246,7 +248,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
             }
         }
         else {
-            Toast.makeText(getActivity(), R.string.bt_not_enabled, Toast.LENGTH_SHORT).show();
+            Toast.makeText(getActivity(), R.string.service_not_started, Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -331,10 +333,6 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                 case Constants.MESSAGE_DEVICE_NAME:
                     // save the connected device's name
                     mConnectedDeviceName = msg.getData().getString(Constants.DEVICE_NAME);
-                    if (null != activity) {
-                        Toast.makeText(activity, "Connected to "
-                                + mConnectedDeviceName, Toast.LENGTH_SHORT).show();
-                    }
                     break;
                 case Constants.MESSAGE_TOAST:
                     if (null != activity) {
@@ -402,7 +400,10 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
         // Get the BluetoothDevice object
         BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(address);
         // Attempt to connect to the device
-        mChatService.connect(device);
+        if (mChatService != null)
+        {
+            mChatService.connect(device);
+        }
     }
 
     @Override

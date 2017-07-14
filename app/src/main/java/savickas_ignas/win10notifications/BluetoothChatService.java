@@ -169,6 +169,7 @@ public class BluetoothChatService extends Service {
         mConnectedDeviceName = device.getName();
 
         updateUserInterfaceTitle();
+        showNotification(getString(R.string.app_name), Constants.INFO_NOTIFICATION_ID, getString(R.string.title_connected_to, mConnectedDeviceName));
     }
 
     /**
@@ -244,6 +245,7 @@ public class BluetoothChatService extends Service {
 
         mState = STATE_NONE;
         updateUserInterfaceTitle();
+        showNotification(getString(R.string.app_name), Constants.INFO_NOTIFICATION_ID, getString(R.string.title_disconnected_from, mConnectedDeviceName));
 
         // Start the service over to restart listening mode
         BluetoothChatService.this.start();
