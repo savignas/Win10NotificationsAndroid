@@ -1,6 +1,7 @@
 package savickas_ignas.win10notifications;
 
 import android.app.Activity;
+import android.app.Notification;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.ComponentName;
@@ -71,11 +72,14 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
      */
     private BluetoothChatService mChatService = null;
 
-    private boolean mIsBound;
+    private boolean connected = false;
+
+    SharedPreferences sharedPreferences;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        sharedPreferences = getActivity().getSharedPreferences("DEVICE", Context.MODE_PRIVATE);
         setHasOptionsMenu(true);
         // Get local Bluetooth adapter
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -98,25 +102,14 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                 Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
                 startActivityForResult(enableIntent, REQUEST_ENABLE_BT);
                 // Otherwise, setup the chat session
-            } else if (mChatService == null) {
-                setupChat(true);
             }
         }
-        else {
-            setupChat(false);
-        }
+        setupChat();
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        /*if (mChatService != null) {
-            mChatService.stop();
-        }
-        if (mIsBound) {
-            getActivity().unbindService(this);
-            mIsBound = false;
-        }*/
     }
 
     @Override
@@ -164,7 +157,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
     /**
      * Set up the UI and background operations for chat.
      */
-    private void setupChat(boolean enabled) {
+    private void setupChat() {
 
         // Initialize the array adapter for the conversation thread
         mConversationArrayAdapter = new ArrayAdapter<>(getActivity(), R.layout.message);
@@ -190,23 +183,23 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                         Intent stopIntent = new Intent(getActivity(), BluetoothChatService.class);
                         stopIntent.setAction(Constants.STOP_FOREGROUND);
                         getActivity().startService(stopIntent);
-                        mIsBound = false;
                         mChatService.stop();
+                        mChatService.setConnected(false);
                         getActivity().unbindService(BluetoothChatFragment.this);
                         mChatService = null;
+                        MenuItem item = menu.findItem(R.id.secure_connect);
+                        String name = sharedPreferences.getString("DEVICE_NAME", "");
+                        item.setTitle(getString(R.string.secure_connect_to, name));
                         menu.setGroupEnabled(0, false);
                     }
                 }
             }
         });
 
-        if (enabled) {
-            // Initialize the BluetoothChatService to perform bluetooth connections
-            Intent startIntent = new Intent(getActivity(), BluetoothChatService.class);
-            getActivity().startService(startIntent);
-            getActivity().bindService(startIntent, BluetoothChatFragment.this, Context.BIND_AUTO_CREATE);
-            mIsBound = true;
-        }
+        // Initialize the BluetoothChatService to perform bluetooth connections
+        Intent startIntent = new Intent(getActivity(), BluetoothChatService.class);
+        getActivity().startService(startIntent);
+        getActivity().bindService(startIntent, BluetoothChatFragment.this, Context.BIND_AUTO_CREATE);
 
         // Initialize the buffer for outgoing messages
         mOutStringBuffer = new StringBuffer("");
@@ -297,8 +290,15 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                 case Constants.MESSAGE_STATE_CHANGE:
                     switch (msg.arg1) {
                         case BluetoothChatService.STATE_CONNECTED:
-                            setStatus(getString(R.string.title_connected_to, mConnectedDeviceName));
+                            setStatus(mChatService.getString(R.string.title_connected_to, mConnectedDeviceName));
+                            if (menu != null)
+                            {
+                                MenuItem item = menu.findItem(R.id.secure_connect);
+                                item.setTitle(mChatService.getString(R.string.secure_disconnect_from, mConnectedDeviceName));
+                                menu.setGroupEnabled(0, true);
+                            }
                             mConversationArrayAdapter.clear();
+                            connected = true;
                             break;
                         case BluetoothChatService.STATE_CONNECTING:
                             setStatus(R.string.title_connecting);
@@ -306,7 +306,25 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                         case BluetoothChatService.STATE_LISTEN:
                         case BluetoothChatService.STATE_NONE:
                             setStatus(R.string.title_not_connected);
+                            String name = sharedPreferences.getString("DEVICE_NAME", "");
+                            if (menu != null && mChatService != null)
+                            {
+                                MenuItem item = menu.findItem(R.id.secure_connect);
+                                item.setTitle(mChatService.getString(R.string.secure_connect_to, name));
+                                menu.setGroupEnabled(0, true);
+                            }
+                            connected = false;
                             break;
+                        case BluetoothChatService.STATE_NO_BLUETOOTH:
+                            setStatus(R.string.title_no_bluetooth);
+                            if (menu != null && mBluetoothAdapter != null)
+                            {
+                                name = sharedPreferences.getString("DEVICE_NAME", "");
+                                MenuItem item = menu.findItem(R.id.secure_connect);
+                                item.setTitle(mChatService.getString(R.string.secure_connect_to, name));
+                                menu.setGroupEnabled(0, false);
+                            }
+                            connected = false;
                     }
                     break;
                 case Constants.MESSAGE_WRITE:
@@ -319,11 +337,18 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                     byte[] readBuf = (byte[]) msg.obj;
                     // construct a string from the valid bytes in the buffer
                     String readMessage = new String(readBuf, 0, msg.arg1);
-                    String[] messageParts = readMessage.split(";");
+                    String[] messageParts = readMessage.split(";" ,-1);
                     mConversationArrayAdapter.add(mConnectedDeviceName + ": " + readMessage);
                     if (Objects.equals(messageParts[0], "1"))
                     {
-                        mChatService.showNotification(messageParts[2], Integer.parseInt(messageParts[1]), messageParts[3]);
+                        if (!Objects.equals(messageParts[4], ""))
+                        {
+                            mChatService.showNotification(messageParts[3], Integer.parseInt(messageParts[1]), messageParts[4], Notification.PRIORITY_DEFAULT);
+                    }
+                        else
+                        {
+                            mChatService.showNotification(messageParts[2], Integer.parseInt(messageParts[1]), messageParts[3], Notification.PRIORITY_DEFAULT);
+                        }
                     }
                     else
                     {
@@ -348,7 +373,6 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
     {
         String address = intent.getStringExtra(DeviceListActivity.EXTRA_DEVICE_ADDRESS);
         String name = intent.getStringExtra(DeviceListActivity.EXTRA_DEVICE_NAME);
-        SharedPreferences sharedPreferences = getActivity().getSharedPreferences("DEVICE", Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPreferences.edit();
         editor.putString("DEVICE_ADDRESS", address);
         editor.putString("DEVICE_NAME", name);
@@ -373,14 +397,10 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                 break;
             case REQUEST_ENABLE_BT:
                 // When the request to enable Bluetooth returns
-                if (resultCode == Activity.RESULT_OK) {
-                    // Bluetooth is now enabled, so set up a chat session
-                    setupChat(true);
-                } else {
+                if (resultCode != Activity.RESULT_OK) {
                     // User did not enable Bluetooth or an error occurred
                     Toast.makeText(getActivity(), R.string.bt_not_enabled,
                             Toast.LENGTH_SHORT).show();
-                    setupChat(false);
                 }
         }
     }
@@ -390,7 +410,6 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
      */
     private void connectDevice() {
         // Get the device MAC address
-        SharedPreferences sharedPreferences = getActivity().getSharedPreferences("DEVICE", Context.MODE_PRIVATE);
         String address = sharedPreferences.getString("DEVICE_ADDRESS", "");
         if (Objects.equals(address, "")) {
             Intent defaultIntent = new Intent(getActivity(), DeviceListActivity.class);
@@ -410,14 +429,17 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
         this.menu = menu;
         inflater.inflate(R.menu.bluetooth_chat, menu);
-        SharedPreferences sharedPreferences = getActivity().getSharedPreferences("DEVICE", Context.MODE_PRIVATE);
         String name = sharedPreferences.getString("DEVICE_NAME", "");
         if (!Objects.equals(name, "")) {
             MenuItem item = menu.findItem(R.id.secure_connect);
-            item.setTitle(getString(R.string.secure_connect_to, name));
-        }
-        if (mBluetoothAdapter == null) {
-            menu.setGroupEnabled(0, false);
+            if (!connected)
+            {
+                item.setTitle(getString(R.string.secure_connect_to, name));
+            }
+            else
+            {
+                item.setTitle(getString(R.string.secure_disconnect_from, name));
+            }
         }
     }
 
@@ -425,7 +447,19 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.secure_connect: {
-                connectDevice();
+                if (!connected)
+                {
+                    connectDevice();
+                }
+                else
+                {
+                    if (mChatService != null)
+                    {
+                        mChatService.stop();
+                        connected = false;
+                        mChatService.setConnected(false);
+                    }
+                }
                 return true;
             }
             case R.id.discoverable: {

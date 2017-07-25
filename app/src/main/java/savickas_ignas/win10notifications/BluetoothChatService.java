@@ -7,7 +7,10 @@ import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.Handler;
@@ -40,12 +43,47 @@ public class BluetoothChatService extends Service {
     private final IBinder mBinder = new MyBinder();
     private String mConnectedDeviceName = null;
     private NotificationManager notificationManager;
+    private BluetoothDevice device;
+    private boolean connected = false;
+    private final Handler handlerReconnect = new Handler();
+    private final Handler handlerNotification = new Handler();
 
     // Constants that indicate the current connection state
     public static final int STATE_NONE = 0;       // we're doing nothing
     public static final int STATE_LISTEN = 1;     // now listening for incoming connections
     public static final int STATE_CONNECTING = 2; // now initiating an outgoing connection
     public static final int STATE_CONNECTED = 3;  // now connected to a remote device
+    public static final int STATE_NO_BLUETOOTH = 4;
+
+    private final BroadcastReceiver mBroadcastReveicer = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            final String action = intent.getAction();
+
+            if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
+                final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
+                switch (state) {
+                    case BluetoothAdapter.STATE_OFF:
+                        mState = STATE_NO_BLUETOOTH;
+                        updateUserInterfaceTitle();
+                        break;
+                    case BluetoothAdapter.STATE_TURNING_OFF:
+                        stop();
+                        break;
+                    case  BluetoothAdapter.STATE_ON:
+                        mState = STATE_NONE;
+                        start();
+                        if (connected)
+                        {
+                            connect(device);
+                        }
+                        break;
+                    case BluetoothAdapter.STATE_TURNING_ON:
+                        break;
+                }
+            }
+        }
+    };
 
     /**
      * Constructor. Prepares a new BluetoothChat session.
@@ -75,6 +113,8 @@ public class BluetoothChatService extends Service {
             case STATE_NONE:
                 setForegroundNotification(getString(R.string.title_not_connected));
                 break;
+            case STATE_NO_BLUETOOTH:
+                setForegroundNotification(getString(R.string.title_no_bluetooth));
         }
     }
 
@@ -83,6 +123,11 @@ public class BluetoothChatService extends Service {
      */
     public synchronized int getState() {
         return mState;
+    }
+
+    public synchronized void setConnected(boolean connected)
+    {
+        this.connected = connected;
     }
 
     /**
@@ -102,6 +147,11 @@ public class BluetoothChatService extends Service {
             }
         }
 
+        if (mAdapter == null || !mAdapter.isEnabled())
+        {
+            mState = STATE_NO_BLUETOOTH;
+        }
+
         updateUserInterfaceTitle();
     }
 
@@ -113,7 +163,7 @@ public class BluetoothChatService extends Service {
     public synchronized void connect(BluetoothDevice device) {
 
         // Cancel any thread attempting to make a connection
-        if (mState == STATE_CONNECTING) {
+        if (getState() == STATE_CONNECTING) {
             if (mConnectThread != null) {
                 mConnectThread.cancel();
                 mConnectThread = null;
@@ -130,6 +180,8 @@ public class BluetoothChatService extends Service {
         mConnectThread = new ConnectThread(device);
         mConnectThread.start();
         updateUserInterfaceTitle();
+
+        this.device = device;
     }
 
     /**
@@ -156,6 +208,7 @@ public class BluetoothChatService extends Service {
         // Start the thread to manage the connection and perform transmissions
         mConnectedThread = new ConnectedThread(socket);
         mConnectedThread.start();
+        connected = true;
 
         if (mHandler != null) {
             // Send the name of the connected device back to the UI Activity
@@ -169,7 +222,8 @@ public class BluetoothChatService extends Service {
         mConnectedDeviceName = device.getName();
 
         updateUserInterfaceTitle();
-        showNotification(getString(R.string.app_name), Constants.INFO_NOTIFICATION_ID, getString(R.string.title_connected_to, mConnectedDeviceName));
+        showNotification(getString(R.string.app_name), Constants.INFO_NOTIFICATION_ID, getString(R.string.title_connected_to, mConnectedDeviceName), Notification.PRIORITY_MIN);
+        dismissNotification();
     }
 
     /**
@@ -214,20 +268,21 @@ public class BluetoothChatService extends Service {
      * Indicate that the connection attempt failed and notify the UI Activity.
      */
     private void connectionFailed() {
-        if (mHandler != null) {
-            // Send a failure message back to the Activity
-            Message msg = mHandler.obtainMessage(Constants.MESSAGE_TOAST);
-            Bundle bundle = new Bundle();
-            bundle.putString(Constants.TOAST, "Unable to connect device");
-            msg.setData(bundle);
-            mHandler.sendMessage(msg);
-        }
-
         mState = STATE_NONE;
         updateUserInterfaceTitle();
 
         // Start the service over to restart listening mode
         BluetoothChatService.this.start();
+
+        if (connected && getState() != STATE_NO_BLUETOOTH)
+        {
+            handlerReconnect.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    BluetoothChatService.this.connect(device);
+                }
+            }, 5000);
+        }
     }
 
     /**
@@ -245,10 +300,21 @@ public class BluetoothChatService extends Service {
 
         mState = STATE_NONE;
         updateUserInterfaceTitle();
-        showNotification(getString(R.string.app_name), Constants.INFO_NOTIFICATION_ID, getString(R.string.title_disconnected_from, mConnectedDeviceName));
+        showNotification(getString(R.string.app_name), Constants.INFO_NOTIFICATION_ID, getString(R.string.title_disconnected_from, mConnectedDeviceName), Notification.PRIORITY_MIN);
+        dismissNotification();
 
         // Start the service over to restart listening mode
         BluetoothChatService.this.start();
+
+        if (connected && getState() != STATE_NO_BLUETOOTH)
+        {
+            handlerReconnect.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    BluetoothChatService.this.connect(device);
+                }
+            }, 5000);
+        }
     }
 
     /**
@@ -343,7 +409,7 @@ public class BluetoothChatService extends Service {
             int bytes;
 
             // Keep listening to the InputStream while connected
-            while (mState == STATE_CONNECTED) {
+            while (BluetoothChatService.this.getState() == STATE_CONNECTED) {
                 try {
                     // Read from the InputStream
                     bytes = mmInStream.read(buffer);
@@ -403,7 +469,7 @@ public class BluetoothChatService extends Service {
                 .setPriority(Notification.PRIORITY_MIN)
                 .build();
 
-        startForeground(Constants.NOTIFICATION_ID, notification);
+        startForeground(Constants.SRV_NOTIFICATION_ID, notification);
     }
 
     @Override
@@ -416,6 +482,9 @@ public class BluetoothChatService extends Service {
         String name = sharedPreferences.getString("DEVICE_NAME", getString(R.string.title_not_connected));*/
 
         setForegroundNotification(getString(R.string.title_not_connected));
+
+        IntentFilter filter = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
+        registerReceiver(mBroadcastReveicer, filter);
     }
 
     @Override
@@ -439,6 +508,8 @@ public class BluetoothChatService extends Service {
         if (mHandler != null) {
             mHandler = null;
         }
+
+        unregisterReceiver(mBroadcastReveicer);
     }
 
     class MyBinder extends Binder {
@@ -454,7 +525,7 @@ public class BluetoothChatService extends Service {
     /**
      * Send a sample notification using the NotificationCompat API.
      */
-    public void showNotification(String appName, int notificationId, String notification) {
+    public void showNotification(String appName, int notificationId, String notification, int priority) {
         /*Intent intent = new Intent(this, NotificationDismissedReceiver.class);
         intent.putExtra("notificationId", notificationId);
         PendingIntent pendingIntent = PendingIntent.getBroadcast(this, notificationId, intent, 0);*/
@@ -466,8 +537,19 @@ public class BluetoothChatService extends Service {
         builder.setColor(ContextCompat.getColor(this, R.color.colorPrimary));
         builder.setLights(WHITE, 1000, 1000);
         builder.setAutoCancel(true);
+        builder.setPriority(priority);
         notificationManager.notify(notificationId, builder.build());
         System.out.print("test");
+    }
+
+    private void dismissNotification()
+    {
+        handlerNotification.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                cancelNotification(Constants.INFO_NOTIFICATION_ID);
+            }
+        }, 5000);
     }
 
     /**

@@ -18,6 +18,6 @@ public interface Constants {
 
     public static final String STOP_FOREGROUND = "stopforeground";
 
-    public static final int NOTIFICATION_ID = 30000;
+    public static final int SRV_NOTIFICATION_ID = 30000;
     public static final int INFO_NOTIFICATION_ID = 30001;
 }
