@@ -20,4 +20,6 @@ public interface Constants {
 
     public static final int SRV_NOTIFICATION_ID = 30000;
     public static final int INFO_NOTIFICATION_ID = 30001;
+
+    public static final String NOTIFICATION_DELETED_ACTION = "NOTIFICATION_DELETED";
 }

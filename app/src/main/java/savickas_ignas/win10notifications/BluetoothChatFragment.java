@@ -4,9 +4,11 @@ import android.app.Activity;
 import android.app.Notification;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -75,6 +77,18 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
     private boolean connected = false;
 
     SharedPreferences sharedPreferences;
+
+    private final BroadcastReceiver mNotificationDismiss = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            final String action = intent.getAction();
+
+            if (action.equals(Constants.NOTIFICATION_DELETED_ACTION)) {
+                int notificationId = intent.getIntExtra("notificationId", 0);
+                sendMessage(Integer.toString(notificationId));
+            }
+        }
+    };
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -147,10 +161,12 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
         mChatService = myBinder.getService();
         mChatService.setHandler(mHandler);
         mChatService.start();
+        mChatService.registerReceiver(mNotificationDismiss, new IntentFilter(Constants.NOTIFICATION_DELETED_ACTION));
     }
 
     @Override
     public void onServiceDisconnected(ComponentName name) {
+        mChatService.unregisterReceiver(mNotificationDismiss);
         mChatService = null;
     }
 
@@ -185,6 +201,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                         getActivity().startService(stopIntent);
                         mChatService.stop();
                         mChatService.setConnected(false);
+                        mChatService.setNotConnected(true);
                         getActivity().unbindService(BluetoothChatFragment.this);
                         mChatService = null;
                         MenuItem item = menu.findItem(R.id.secure_connect);
@@ -222,7 +239,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
      *
      * @param message A string of text to send.
      */
-    public void sendMessage(String message) {
+    private void sendMessage(String message) {
         if (mChatService != null) {
             // Check that we're actually connected before trying anything
             if (mChatService.getState() != BluetoothChatService.STATE_CONNECTED) {
@@ -458,6 +475,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                         mChatService.stop();
                         connected = false;
                         mChatService.setConnected(false);
+                        mChatService.setNotConnected(true);
                     }
                 }
                 return true;

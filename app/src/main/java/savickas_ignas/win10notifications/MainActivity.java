@@ -22,8 +22,6 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        registerReceiver(broadcastReceiver, new IntentFilter("NOTIFICATION_DELETED"));
-
         if (savedInstanceState == null) {
             FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
             fragment = new BluetoothChatFragment();
@@ -51,14 +49,5 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        unregisterReceiver(broadcastReceiver);
     }
-
-    private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            int notificationId = intent.getIntExtra("notificationId", 0);
-            fragment.sendMessage(Integer.toString(notificationId));
-        }
-    };
 }

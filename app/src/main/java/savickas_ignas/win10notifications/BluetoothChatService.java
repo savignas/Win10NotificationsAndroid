@@ -45,6 +45,8 @@ public class BluetoothChatService extends Service {
     private NotificationManager notificationManager;
     private BluetoothDevice device;
     private boolean connected = false;
+    private boolean connecting = false;
+    private boolean notConnected = true;
     private final Handler handlerReconnect = new Handler();
     private final Handler handlerNotification = new Handler();
 
@@ -55,7 +57,7 @@ public class BluetoothChatService extends Service {
     public static final int STATE_CONNECTED = 3;  // now connected to a remote device
     public static final int STATE_NO_BLUETOOTH = 4;
 
-    private final BroadcastReceiver mBroadcastReveicer = new BroadcastReceiver() {
+    private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             final String action = intent.getAction();
@@ -105,16 +107,31 @@ public class BluetoothChatService extends Service {
         switch (mNewState) {
             case STATE_CONNECTED:
                 setForegroundNotification(getString(R.string.title_connected_to, mConnectedDeviceName));
+                connecting = false;
                 break;
             case STATE_CONNECTING:
-                setForegroundNotification(getString(R.string.title_connecting));
+                if (!connecting && connected)
+                {
+                    setForegroundNotification(getString(R.string.title_connecting));
+                    connecting = true;
+                }
                 break;
             case STATE_LISTEN:
             case STATE_NONE:
-                setForegroundNotification(getString(R.string.title_not_connected));
+                if (!connecting && !connected && notConnected)
+                {
+                    setForegroundNotification(getString(R.string.title_not_connected));
+                    notConnected = false;
+                }
+                else if (connected && !connecting)
+                {
+                    setForegroundNotification(getString(R.string.title_connecting));
+                    connecting = true;
+                }
                 break;
             case STATE_NO_BLUETOOTH:
                 setForegroundNotification(getString(R.string.title_no_bluetooth));
+                connecting = false;
         }
     }
 
@@ -128,6 +145,11 @@ public class BluetoothChatService extends Service {
     public synchronized void setConnected(boolean connected)
     {
         this.connected = connected;
+    }
+
+    public synchronized void setNotConnected(boolean notConnected)
+    {
+        this.notConnected = notConnected;
     }
 
     /**
@@ -484,7 +506,8 @@ public class BluetoothChatService extends Service {
         setForegroundNotification(getString(R.string.title_not_connected));
 
         IntentFilter filter = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
-        registerReceiver(mBroadcastReveicer, filter);
+
+        registerReceiver(mBroadcastReceiver, filter);
     }
 
     @Override
@@ -509,7 +532,7 @@ public class BluetoothChatService extends Service {
             mHandler = null;
         }
 
-        unregisterReceiver(mBroadcastReveicer);
+        unregisterReceiver(mBroadcastReceiver);
     }
 
     class MyBinder extends Binder {
@@ -526,20 +549,23 @@ public class BluetoothChatService extends Service {
      * Send a sample notification using the NotificationCompat API.
      */
     public void showNotification(String appName, int notificationId, String notification, int priority) {
-        /*Intent intent = new Intent(this, NotificationDismissedReceiver.class);
-        intent.putExtra("notificationId", notificationId);
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, notificationId, intent, 0);*/
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this);
+        if (priority != Notification.PRIORITY_MIN)
+        {
+            Intent intent = new Intent(Constants.NOTIFICATION_DELETED_ACTION);
+            intent.putExtra("notificationId", notificationId);
+            PendingIntent pendingIntent = PendingIntent.getBroadcast(this, notificationId, intent, 0);
+            builder.setDeleteIntent(pendingIntent);
+        }
+
         builder.setSmallIcon(R.drawable.ic_notification);
         builder.setContentTitle(appName);
         builder.setContentText(notification);
-        //builder.setDeleteIntent(pendingIntent);
         builder.setColor(ContextCompat.getColor(this, R.color.colorPrimary));
         builder.setLights(WHITE, 1000, 1000);
         builder.setAutoCancel(true);
         builder.setPriority(priority);
         notificationManager.notify(notificationId, builder.build());
-        System.out.print("test");
     }
 
     private void dismissNotification()
