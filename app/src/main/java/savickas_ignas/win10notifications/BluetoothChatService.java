@@ -512,7 +512,7 @@ public class BluetoothChatService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent.getAction() != null && intent.getAction().equals(Constants.STOP_FOREGROUND)) {
+        if (intent.getAction() != null && intent.getAction().equals(Constants.STOP_FOREGROUND_ACTION)) {
             Toast.makeText(this, "service stopped", Toast.LENGTH_LONG).show();
             stopForeground(true);
             stopSelf();

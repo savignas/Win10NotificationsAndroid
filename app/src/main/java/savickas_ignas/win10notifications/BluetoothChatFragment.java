@@ -90,6 +90,17 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
         }
     };
 
+    private final BroadcastReceiver mNotificationListener = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            final String action = intent.getAction();
+
+            if (action.equals(Constants.NOTIFICATION_LISTENER_ACTION)) {
+                String packageName = intent.getStringExtra("onNotificationPosted");
+            }
+        }
+    };
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -103,6 +114,9 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
             FragmentActivity activity = getActivity();
             Toast.makeText(activity, "Bluetooth is not available", Toast.LENGTH_LONG).show();
         }
+
+        Intent intent=new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS");
+        startActivity(intent);
     }
 
 
@@ -162,11 +176,13 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
         mChatService.setHandler(mHandler);
         mChatService.start();
         mChatService.registerReceiver(mNotificationDismiss, new IntentFilter(Constants.NOTIFICATION_DELETED_ACTION));
+        mChatService.registerReceiver(mNotificationListener, new IntentFilter(Constants.NOTIFICATION_LISTENER_ACTION));
     }
 
     @Override
     public void onServiceDisconnected(ComponentName name) {
         mChatService.unregisterReceiver(mNotificationDismiss);
+        mChatService.unregisterReceiver(mNotificationListener);
         mChatService = null;
     }
 
@@ -197,7 +213,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                 if (null != view) {
                     if (mChatService != null) {
                         Intent stopIntent = new Intent(getActivity(), BluetoothChatService.class);
-                        stopIntent.setAction(Constants.STOP_FOREGROUND);
+                        stopIntent.setAction(Constants.STOP_FOREGROUND_ACTION);
                         getActivity().startService(stopIntent);
                         mChatService.stop();
                         mChatService.setConnected(false);

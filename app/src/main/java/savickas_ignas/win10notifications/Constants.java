@@ -16,10 +16,11 @@ public interface Constants {
     public static final String DEVICE_NAME = "device_name";
     public static final String TOAST = "toast";
 
-    public static final String STOP_FOREGROUND = "stopforeground";
+    public static final String STOP_FOREGROUND_ACTION = "win10motifications.STOP_FOREGROUND";
 
     public static final int SRV_NOTIFICATION_ID = 30000;
     public static final int INFO_NOTIFICATION_ID = 30001;
 
-    public static final String NOTIFICATION_DELETED_ACTION = "NOTIFICATION_DELETED";
+    public static final String NOTIFICATION_DELETED_ACTION = "win10notifications.NOTIFICATION_DELETED";
+    public static final String NOTIFICATION_LISTENER_ACTION = "win10notifications.NOTIFICATION_LISTENER_ACTION";
 }
