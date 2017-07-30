@@ -350,12 +350,12 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                             break;
                         case BluetoothChatService.STATE_NO_BLUETOOTH:
                             setStatus(R.string.title_no_bluetooth);
-                            if (menu != null && mBluetoothAdapter != null)
+                            if (menu != null)
                             {
                                 name = sharedPreferences.getString("DEVICE_NAME", "");
                                 MenuItem item = menu.findItem(R.id.secure_connect);
                                 item.setTitle(mChatService.getString(R.string.secure_connect_to, name));
-                                menu.setGroupEnabled(0, false);
+                                menu.setGroupEnabled(0, true); // false
                             }
                             connected = false;
                     }
@@ -505,6 +505,10 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                 Intent defaultIntent = new Intent(getActivity(), DeviceListActivity.class);
                 startActivityForResult(defaultIntent, REQUEST_SELECT_DEFAULT_DEVICE);
                 return true;
+            }
+            case R.id.send_notifications: {
+                Intent defaultIntent = new Intent(getActivity(), SendNotificationsSettingsActivity.class);
+                startActivity(defaultIntent);
             }
         }
         return false;
