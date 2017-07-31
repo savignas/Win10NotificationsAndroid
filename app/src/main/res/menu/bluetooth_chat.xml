@@ -16,7 +16,7 @@
         android:title="@string/select_default"/>
 
     <item
-        android:id="@+id/send_notifications"
+        android:id="@+id/settings"
         app:showAsAction="never"
-        android:title="@string/send_notifications"/>
+        android:title="@string/action_settings"/>
 </menu>

@@ -42,8 +42,8 @@
         </service>
 
         <activity
-            android:name=".SendNotificationsSettingsActivity"
-            android:label="@string/title_activity_send_notifications_settings"
+            android:name=".SettingsActivity"
+            android:label="@string/title_activity_settings"
             android:parentActivityName=".MainActivity">
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"

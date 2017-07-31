@@ -30,9 +30,8 @@
     <string name="secure_disconnect_from">Disconnect from <xliff:g id="device_name">%1$s</xliff:g></string>
     <string name="discoverable">Make discoverable</string>
     <string name="select_default">Select default device</string>
-    <string name="send_notifications">Send notifications</string>
     <string name="title_activity_main">MainActivity</string>
-    <string name="title_activity_send_notifications_settings">Send Notifications Settings</string>
+    <string name="title_activity_settings">Settings</string>
 
     <!-- Strings related to Settings -->
 
@@ -97,12 +96,9 @@
     <string name="pref_title_system_sync_settings">System sync settings</string>
 
     <!-- Example settings for Notifications -->
-    <string name="pref_header_notifications">Notifications</string>
+    <string name="pref_header_send_notifications">Send notifications</string>
 
-    <string name="pref_title_new_message_notifications">New message notifications</string>
+    <string name="pref_title_send_notifications_enabled">Enabled</string>
 
-    <string name="pref_title_ringtone">Ringtone</string>
-    <string name="pref_ringtone_silent">Silent</string>
-
-    <string name="pref_title_vibrate">Vibrate</string>
+    <string name="pref_title_choose_apps">Choose which apps to send</string>
 </resources>

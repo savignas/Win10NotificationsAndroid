@@ -114,9 +114,6 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
             FragmentActivity activity = getActivity();
             Toast.makeText(activity, "Bluetooth is not available", Toast.LENGTH_LONG).show();
         }
-
-        Intent intent=new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS");
-        startActivity(intent);
     }
 
 
@@ -506,8 +503,8 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                 startActivityForResult(defaultIntent, REQUEST_SELECT_DEFAULT_DEVICE);
                 return true;
             }
-            case R.id.send_notifications: {
-                Intent defaultIntent = new Intent(getActivity(), SendNotificationsSettingsActivity.class);
+            case R.id.settings: {
+                Intent defaultIntent = new Intent(getActivity(), SettingsActivity.class);
                 startActivity(defaultIntent);
             }
         }
