@@ -23,4 +23,5 @@ public interface Constants {
 
     public static final String NOTIFICATION_DELETED_ACTION = "win10notifications.NOTIFICATION_DELETED";
     public static final String NOTIFICATION_LISTENER_ACTION = "win10notifications.NOTIFICATION_LISTENER_ACTION";
+    public static final String NOTIFICATION_LISTENER_STATE = "win10notifications.NOTIFICATION_LISTENER_STATE";
 }

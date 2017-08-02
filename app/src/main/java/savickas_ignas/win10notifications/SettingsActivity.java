@@ -2,27 +2,25 @@ package savickas_ignas.win10notifications;
 
 
 import android.annotation.TargetApi;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.res.Configuration;
-import android.media.Ringtone;
-import android.media.RingtoneManager;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceActivity;
+import android.preference.SwitchPreference;
 import android.support.v7.app.ActionBar;
 import android.preference.PreferenceFragment;
 import android.preference.PreferenceManager;
-import android.preference.RingtonePreference;
-import android.text.TextUtils;
 import android.view.MenuItem;
 import android.support.v4.app.NavUtils;
 
 import java.util.List;
-import java.util.prefs.PreferenceChangeListener;
 
 /**
  * A {@link PreferenceActivity} that presents a set of application settings. On
@@ -36,6 +34,14 @@ import java.util.prefs.PreferenceChangeListener;
  * API Guide</a> for more information on developing a Settings UI.
  */
 public class SettingsActivity extends AppCompatPreferenceActivity {
+
+    private static SharedPreferences sharedPreferences;
+
+    private static void goToNotificationListenerSettings(Context context)
+    {
+        Intent intent = new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS");
+        context.startActivity(intent);
+    }
     /**
      * A preference value change listener that updates the preference's summary
      * to reflect its new value.
@@ -69,13 +75,16 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
     private static Preference.OnPreferenceChangeListener sPreferenceChangeListener = new Preference.OnPreferenceChangeListener() {
         @Override
         public boolean onPreferenceChange(Preference preference, Object value) {
-            if ((boolean)value)
+            if ((boolean)value && !sharedPreferences.getBoolean("NOTIFICATION_LISTENER", false))
             {
-                Intent intent = new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS");
-                SettingsActivity.this.startActivity(intent);
+                goToNotificationListenerSettings(preference.getContext());
+            }
+            else if (!(boolean)value && sharedPreferences.getBoolean("NOTIFICATION_LISTENER", false))
+            {
+                goToNotificationListenerSettings(preference.getContext());
             }
 
-            return true;
+            return false;
         }
     };
 
@@ -118,6 +127,7 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setupActionBar();
+        sharedPreferences = getSharedPreferences("DEVICE", Context.MODE_PRIVATE);
     }
 
     /**
@@ -207,13 +217,38 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
      */
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     public static class SendNotificationsPreferenceFragment extends PreferenceFragment {
+        private final BroadcastReceiver mNotificationListenerState = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                final String action = intent.getAction();
+
+                if (action.equals(Constants.NOTIFICATION_LISTENER_STATE)) {
+                    boolean state = intent.getBooleanExtra("notificationListenerState", false);
+                    SwitchPreference switchPreference = (SwitchPreference) findPreference("send_notifications_enabled");
+                    switchPreference.setChecked(state);
+                }
+            }
+        };
+
         @Override
         public void onCreate(Bundle savedInstanceState) {
             super.onCreate(savedInstanceState);
             addPreferencesFromResource(R.xml.pref_send_notifications);
             setHasOptionsMenu(true);
+            getActivity().registerReceiver(mNotificationListenerState, new IntentFilter(Constants.NOTIFICATION_LISTENER_STATE));
 
-            preferenceChangeListener(findPreference("send_notifications_enabled"));
+            boolean state = sharedPreferences.getBoolean("NOTIFICATION_LISTENER", false);
+            SwitchPreference switchPreference = (SwitchPreference) findPreference("send_notifications_enabled");
+            switchPreference.setChecked(state);
+
+            preferenceChangeListener(switchPreference);
+        }
+
+        @Override
+        public void onDestroy()
+        {
+            super.onDestroy();
+            getActivity().unregisterReceiver(mNotificationListenerState);
         }
 
         @Override
