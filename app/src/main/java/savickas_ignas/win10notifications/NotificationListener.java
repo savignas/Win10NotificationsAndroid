@@ -3,20 +3,26 @@ package savickas_ignas.win10notifications;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.IBinder;
+import android.preference.Preference;
+import android.preference.PreferenceManager;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
 import android.widget.Toast;
+
+import java.util.Set;
 
 
 public class NotificationListener extends NotificationListenerService {
 
     private SharedPreferences sharedPreferences;
+    private SharedPreferences defaultSharedPreferences;
 
     @Override
-    public void onCreate()
-    {
+    public void onCreate() {
         super.onCreate();
         sharedPreferences = getSharedPreferences("DEVICE", Context.MODE_PRIVATE);
+        defaultSharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
         Toast.makeText(this, "Notification listener started", Toast.LENGTH_SHORT).show();
         SharedPreferences.Editor editor = sharedPreferences.edit();
         editor.putBoolean("NOTIFICATION_LISTENER", true);
@@ -27,8 +33,7 @@ public class NotificationListener extends NotificationListenerService {
     }
 
     @Override
-    public void onDestroy()
-    {
+    public void onDestroy() {
         super.onDestroy();
         Toast.makeText(this, "Notification listener stopped", Toast.LENGTH_SHORT).show();
         SharedPreferences.Editor editor = sharedPreferences.edit();
@@ -40,18 +45,29 @@ public class NotificationListener extends NotificationListenerService {
     }
 
     @Override
-    public void onNotificationPosted(StatusBarNotification statusBarNotification)
-    {
-        Intent intent = new Intent(Constants.NOTIFICATION_LISTENER_ACTION);
-        intent.putExtra("onNotificationPosted", statusBarNotification.getPackageName());
-        sendBroadcast(intent);
+    public void onNotificationPosted(StatusBarNotification statusBarNotification) {
+        sendNotification(statusBarNotification, Constants.NOTIFICATION_LISTENER_POSTED_ACTION);
     }
 
     @Override
-    public void onNotificationRemoved(StatusBarNotification statusBarNotification)
+    public void onNotificationRemoved(StatusBarNotification statusBarNotification) {
+        sendNotification(statusBarNotification, Constants.NOTIFICATION_LISTENER_REMOVED_ACTION);
+    }
+
+    private void sendNotification(StatusBarNotification statusBarNotification, String action)
     {
-        Intent intent = new Intent(Constants.NOTIFICATION_LISTENER_ACTION);
-        intent.putExtra("onNotificationRemoved", statusBarNotification.getPackageName());
-        sendBroadcast(intent);
+        Set<String> apps = defaultSharedPreferences.getStringSet("apps_list", null);
+        String appPackageName = statusBarNotification.getPackageName();
+        if (apps != null) {
+            for (String app: apps)
+            {
+                if (app.equals(appPackageName)) {
+                    Intent intent = new Intent(action);
+                    intent.putExtra("statusBarNotification", statusBarNotification);
+                    sendBroadcast(intent);
+                    break;
+                }
+            }
+        }
     }
 }

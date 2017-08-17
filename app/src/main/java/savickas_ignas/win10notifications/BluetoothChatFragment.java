@@ -15,6 +15,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
+import android.service.notification.StatusBarNotification;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentActivity;
@@ -85,7 +86,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
 
             if (action.equals(Constants.NOTIFICATION_DELETED_ACTION)) {
                 int notificationId = intent.getIntExtra("notificationId", 0);
-                sendMessage(Integer.toString(notificationId));
+                sendMessage("0;" + Integer.toString(notificationId));
             }
         }
     };
@@ -95,8 +96,17 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
         public void onReceive(Context context, Intent intent) {
             final String action = intent.getAction();
 
-            if (action.equals(Constants.NOTIFICATION_LISTENER_ACTION)) {
-                String packageName = intent.getStringExtra("onNotificationPosted");
+            if (action.equals(Constants.NOTIFICATION_LISTENER_POSTED_ACTION)) {
+                StatusBarNotification statusBarNotification = intent.getParcelableExtra("statusBarNotification");
+                int id = statusBarNotification.getId();
+                String title = statusBarNotification.getNotification().extras.getString("android.title");
+                String text = statusBarNotification.getNotification().extras.getString("android.text");
+                sendMessage("1;" + Integer.toString(id) + ";" + title + ";" + text);
+            }
+            if (action.equals(Constants.NOTIFICATION_LISTENER_REMOVED_ACTION)) {
+                StatusBarNotification statusBarNotification = intent.getParcelableExtra("statusBarNotification");
+                int id = statusBarNotification.getId();
+                sendMessage("0;" + Integer.toString(id));
             }
         }
     };
@@ -173,7 +183,10 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
         mChatService.setHandler(mHandler);
         mChatService.start();
         mChatService.registerReceiver(mNotificationDismiss, new IntentFilter(Constants.NOTIFICATION_DELETED_ACTION));
-        mChatService.registerReceiver(mNotificationListener, new IntentFilter(Constants.NOTIFICATION_LISTENER_ACTION));
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(Constants.NOTIFICATION_LISTENER_POSTED_ACTION);
+        intentFilter.addAction(Constants.NOTIFICATION_LISTENER_REMOVED_ACTION);
+        mChatService.registerReceiver(mNotificationListener, intentFilter);
     }
 
     @Override
@@ -367,7 +380,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                     byte[] readBuf = (byte[]) msg.obj;
                     // construct a string from the valid bytes in the buffer
                     String readMessage = new String(readBuf, 0, msg.arg1);
-                    String[] messageParts = readMessage.split(";" ,-1);
+                    String[] messageParts = readMessage.split(";", -1);
                     mConversationArrayAdapter.add(mConnectedDeviceName + ": " + readMessage);
                     if (Objects.equals(messageParts[0], "1"))
                     {
@@ -380,7 +393,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                             mChatService.showNotification(messageParts[2], Integer.parseInt(messageParts[1]), messageParts[3], Notification.PRIORITY_DEFAULT);
                         }
                     }
-                    else
+                    else if (Objects.equals(messageParts[0], "0"))
                     {
                         mChatService.cancelNotification(Integer.parseInt(messageParts[1]));
                     }

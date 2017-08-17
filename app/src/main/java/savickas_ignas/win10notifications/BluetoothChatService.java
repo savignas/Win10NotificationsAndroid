@@ -548,7 +548,7 @@ public class BluetoothChatService extends Service {
     /**
      * Send a sample notification using the NotificationCompat API.
      */
-    public void showNotification(String appName, int notificationId, String notification, int priority) {
+    public void showNotification(String title, int notificationId, String text, int priority) {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this);
         if (priority != Notification.PRIORITY_MIN)
         {
@@ -559,8 +559,8 @@ public class BluetoothChatService extends Service {
         }
 
         builder.setSmallIcon(R.drawable.ic_notification);
-        builder.setContentTitle(appName);
-        builder.setContentText(notification);
+        builder.setContentTitle(title);
+        builder.setContentText(text);
         builder.setColor(ContextCompat.getColor(this, R.color.colorPrimary));
         builder.setLights(WHITE, 1000, 1000);
         builder.setAutoCancel(true);

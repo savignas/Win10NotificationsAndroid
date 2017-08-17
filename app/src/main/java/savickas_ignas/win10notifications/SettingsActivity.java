@@ -7,10 +7,13 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.ListPreference;
+import android.preference.MultiSelectListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceActivity;
 import android.preference.SwitchPreference;
@@ -20,6 +23,7 @@ import android.preference.PreferenceManager;
 import android.view.MenuItem;
 import android.support.v4.app.NavUtils;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -75,15 +79,7 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
     private static Preference.OnPreferenceChangeListener sPreferenceChangeListener = new Preference.OnPreferenceChangeListener() {
         @Override
         public boolean onPreferenceChange(Preference preference, Object value) {
-            if ((boolean)value && !sharedPreferences.getBoolean("NOTIFICATION_LISTENER", false))
-            {
-                goToNotificationListenerSettings(preference.getContext());
-            }
-            else if (!(boolean)value && sharedPreferences.getBoolean("NOTIFICATION_LISTENER", false))
-            {
-                goToNotificationListenerSettings(preference.getContext());
-            }
-
+            goToNotificationListenerSettings(preference.getContext());
             return false;
         }
     };
@@ -242,6 +238,28 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
             switchPreference.setChecked(state);
 
             preferenceChangeListener(switchPreference);
+
+            final PackageManager pm = getActivity().getPackageManager();
+            Intent intent = new Intent(Intent.ACTION_MAIN, null);
+            intent.addCategory(Intent.CATEGORY_LAUNCHER);
+            List<ResolveInfo> apps = pm.queryIntentActivities(intent, PackageManager.GET_META_DATA);
+
+            List<CharSequence> appsNames = new ArrayList<>();
+            List<CharSequence> appsPackageNames = new ArrayList<>();
+            for (ResolveInfo app: apps)
+            {
+                if (!app.activityInfo.packageName.equals("savickas_ignas.win10notifications"))
+                {
+                    CharSequence name = app.loadLabel(pm);
+                    CharSequence packageName = app.activityInfo.packageName;
+                    appsNames.add(name);
+                    appsPackageNames.add(packageName);
+                }
+            }
+
+            MultiSelectListPreference appsListView = (MultiSelectListPreference) findPreference("apps_list");
+            appsListView.setEntries(appsNames.toArray(new CharSequence[]{}));
+            appsListView.setEntryValues(appsPackageNames.toArray(new CharSequence[]{}));
         }
 
         @Override
