@@ -79,34 +79,30 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
 
     SharedPreferences sharedPreferences;
 
-    private final BroadcastReceiver mNotificationDismiss = new BroadcastReceiver() {
+    private final BroadcastReceiver mNotificationAction = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             final String action = intent.getAction();
 
-            if (action.equals(Constants.NOTIFICATION_DELETED_ACTION)) {
-                int notificationId = intent.getIntExtra("notificationId", 0);
-                sendMessage("0;" + Integer.toString(notificationId));
-            }
-        }
-    };
-
-    private final BroadcastReceiver mNotificationListener = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            final String action = intent.getAction();
-
-            if (action.equals(Constants.NOTIFICATION_LISTENER_POSTED_ACTION)) {
-                StatusBarNotification statusBarNotification = intent.getParcelableExtra("statusBarNotification");
-                int id = statusBarNotification.getId();
-                String title = statusBarNotification.getNotification().extras.getString("android.title");
-                String text = statusBarNotification.getNotification().extras.getString("android.text");
-                sendMessage("1;" + Integer.toString(id) + ";" + title + ";" + text);
-            }
-            if (action.equals(Constants.NOTIFICATION_LISTENER_REMOVED_ACTION)) {
-                StatusBarNotification statusBarNotification = intent.getParcelableExtra("statusBarNotification");
-                int id = statusBarNotification.getId();
-                sendMessage("0;" + Integer.toString(id));
+            switch (action) {
+                case Constants.NOTIFICATION_LISTENER_POSTED_ACTION: {
+                    StatusBarNotification statusBarNotification = intent.getParcelableExtra("statusBarNotification");
+                    String key = statusBarNotification.getKey();
+                    String title = statusBarNotification.getNotification().extras.getString("android.title");
+                    String text = statusBarNotification.getNotification().extras.getString("android.text");
+                    sendMessage("1;" + key + ";" + title + ";" + text);
+                    break;
+                }
+                case Constants.NOTIFICATION_LISTENER_REMOVED_ACTION: {
+                    StatusBarNotification statusBarNotification = intent.getParcelableExtra("statusBarNotification");
+                    String key = statusBarNotification.getKey();
+                    sendMessage("0;" + key);
+                    break;
+                }
+                case Constants.NOTIFICATION_DELETED_ACTION:
+                    int notificationId = intent.getIntExtra("notificationId", 0);
+                    sendMessage("0;" + Integer.toString(notificationId));
+                    break;
             }
         }
     };
@@ -182,17 +178,16 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
         mChatService = myBinder.getService();
         mChatService.setHandler(mHandler);
         mChatService.start();
-        mChatService.registerReceiver(mNotificationDismiss, new IntentFilter(Constants.NOTIFICATION_DELETED_ACTION));
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(Constants.NOTIFICATION_LISTENER_POSTED_ACTION);
         intentFilter.addAction(Constants.NOTIFICATION_LISTENER_REMOVED_ACTION);
-        mChatService.registerReceiver(mNotificationListener, intentFilter);
+        intentFilter.addAction(Constants.NOTIFICATION_DELETED_ACTION);
+        mChatService.registerReceiver(mNotificationAction, intentFilter);
     }
 
     @Override
     public void onServiceDisconnected(ComponentName name) {
-        mChatService.unregisterReceiver(mNotificationDismiss);
-        mChatService.unregisterReceiver(mNotificationListener);
+        mChatService.unregisterReceiver(mNotificationAction);
         mChatService = null;
     }
 
@@ -334,8 +329,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                     switch (msg.arg1) {
                         case BluetoothChatService.STATE_CONNECTED:
                             setStatus(mChatService.getString(R.string.title_connected_to, mConnectedDeviceName));
-                            if (menu != null)
-                            {
+                            if (menu != null) {
                                 MenuItem item = menu.findItem(R.id.secure_connect);
                                 item.setTitle(mChatService.getString(R.string.secure_disconnect_from, mConnectedDeviceName));
                                 menu.setGroupEnabled(0, true);
@@ -350,8 +344,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                         case BluetoothChatService.STATE_NONE:
                             setStatus(R.string.title_not_connected);
                             String name = sharedPreferences.getString("DEVICE_NAME", "");
-                            if (menu != null && mChatService != null)
-                            {
+                            if (menu != null && mChatService != null) {
                                 MenuItem item = menu.findItem(R.id.secure_connect);
                                 item.setTitle(mChatService.getString(R.string.secure_connect_to, name));
                                 menu.setGroupEnabled(0, true);
@@ -360,8 +353,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                             break;
                         case BluetoothChatService.STATE_NO_BLUETOOTH:
                             setStatus(R.string.title_no_bluetooth);
-                            if (menu != null)
-                            {
+                            if (menu != null) {
                                 name = sharedPreferences.getString("DEVICE_NAME", "");
                                 MenuItem item = menu.findItem(R.id.secure_connect);
                                 item.setTitle(mChatService.getString(R.string.secure_connect_to, name));
@@ -382,20 +374,23 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                     String readMessage = new String(readBuf, 0, msg.arg1);
                     String[] messageParts = readMessage.split(";", -1);
                     mConversationArrayAdapter.add(mConnectedDeviceName + ": " + readMessage);
-                    if (Objects.equals(messageParts[0], "1"))
-                    {
-                        if (!Objects.equals(messageParts[4], ""))
-                        {
+                    if (Objects.equals(messageParts[0], "1")) {
+                        if (!Objects.equals(messageParts[4], "")) {
                             mChatService.showNotification(messageParts[3], Integer.parseInt(messageParts[1]), messageParts[4], Notification.PRIORITY_DEFAULT);
-                    }
-                        else
-                        {
+                        }
+                        else {
                             mChatService.showNotification(messageParts[2], Integer.parseInt(messageParts[1]), messageParts[3], Notification.PRIORITY_DEFAULT);
                         }
                     }
-                    else if (Objects.equals(messageParts[0], "0"))
-                    {
-                        mChatService.cancelNotification(Integer.parseInt(messageParts[1]));
+                    else if (Objects.equals(messageParts[0], "0")) {
+                        try {
+                            mChatService.cancelNotification(Integer.parseInt(messageParts[1]));
+                        }
+                        catch (Exception ex) {
+                            Intent intent = new Intent(Constants.NOTIFICATION_LISTENER_CANCELED_ACTION);
+                            intent.putExtra("key", messageParts[1]);
+                            mChatService.sendBroadcast(intent);
+                        }
                     }
                     break;
                 case Constants.MESSAGE_DEVICE_NAME:
@@ -412,8 +407,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
         }
     };
 
-    private void getAddress(Intent intent)
-    {
+    private void getAddress(Intent intent) {
         String address = intent.getStringExtra(DeviceListActivity.EXTRA_DEVICE_ADDRESS);
         String name = intent.getStringExtra(DeviceListActivity.EXTRA_DEVICE_NAME);
         SharedPreferences.Editor editor = sharedPreferences.edit();
@@ -462,8 +456,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
         // Get the BluetoothDevice object
         BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(address);
         // Attempt to connect to the device
-        if (mChatService != null)
-        {
+        if (mChatService != null) {
             mChatService.connect(device);
         }
     }
@@ -475,12 +468,10 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
         String name = sharedPreferences.getString("DEVICE_NAME", "");
         if (!Objects.equals(name, "")) {
             MenuItem item = menu.findItem(R.id.secure_connect);
-            if (!connected)
-            {
+            if (!connected) {
                 item.setTitle(getString(R.string.secure_connect_to, name));
             }
-            else
-            {
+            else {
                 item.setTitle(getString(R.string.secure_disconnect_from, name));
             }
         }
@@ -490,14 +481,11 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.secure_connect: {
-                if (!connected)
-                {
+                if (!connected) {
                     connectDevice();
                 }
-                else
-                {
-                    if (mChatService != null)
-                    {
+                else {
+                    if (mChatService != null) {
                         mChatService.stop();
                         connected = false;
                         mChatService.setConnected(false);

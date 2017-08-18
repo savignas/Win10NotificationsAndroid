@@ -24,6 +24,8 @@ import android.view.MenuItem;
 import android.support.v4.app.NavUtils;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -243,6 +245,12 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
             Intent intent = new Intent(Intent.ACTION_MAIN, null);
             intent.addCategory(Intent.CATEGORY_LAUNCHER);
             List<ResolveInfo> apps = pm.queryIntentActivities(intent, PackageManager.GET_META_DATA);
+            Collections.sort(apps, new Comparator<ResolveInfo>() {
+                @Override
+                public int compare(ResolveInfo o1, ResolveInfo o2) {
+                    return o1.loadLabel(pm).toString().compareTo(o2.loadLabel(pm).toString());
+                }
+            });
 
             List<CharSequence> appsNames = new ArrayList<>();
             List<CharSequence> appsPackageNames = new ArrayList<>();

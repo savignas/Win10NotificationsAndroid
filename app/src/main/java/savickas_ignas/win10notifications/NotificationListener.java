@@ -1,10 +1,10 @@
 package savickas_ignas.win10notifications;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
-import android.os.IBinder;
-import android.preference.Preference;
 import android.preference.PreferenceManager;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
@@ -18,11 +18,24 @@ public class NotificationListener extends NotificationListenerService {
     private SharedPreferences sharedPreferences;
     private SharedPreferences defaultSharedPreferences;
 
+    private final BroadcastReceiver mNotificationCancel = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            final String action = intent.getAction();
+
+            if (action.equals(Constants.NOTIFICATION_LISTENER_CANCELED_ACTION)) {
+                String key = intent.getStringExtra("key");
+                cancelNotification(key);
+            }
+        }
+    };
+
     @Override
     public void onCreate() {
         super.onCreate();
         sharedPreferences = getSharedPreferences("DEVICE", Context.MODE_PRIVATE);
         defaultSharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        registerReceiver(mNotificationCancel, new IntentFilter(Constants.NOTIFICATION_LISTENER_CANCELED_ACTION));
         Toast.makeText(this, "Notification listener started", Toast.LENGTH_SHORT).show();
         SharedPreferences.Editor editor = sharedPreferences.edit();
         editor.putBoolean("NOTIFICATION_LISTENER", true);
@@ -35,6 +48,7 @@ public class NotificationListener extends NotificationListenerService {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        unregisterReceiver(mNotificationCancel);
         Toast.makeText(this, "Notification listener stopped", Toast.LENGTH_SHORT).show();
         SharedPreferences.Editor editor = sharedPreferences.edit();
         editor.putBoolean("NOTIFICATION_LISTENER", false);
