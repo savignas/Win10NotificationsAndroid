@@ -11,6 +11,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -46,7 +47,6 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
 
     // Layout Views
     private ListView mConversationView;
-    private Button mTestSendButton;
     private Button mServiceStopButton;
     private Menu menu;
 
@@ -86,16 +86,14 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
 
             switch (action) {
                 case Constants.NOTIFICATION_LISTENER_POSTED_ACTION: {
-                    StatusBarNotification statusBarNotification = intent.getParcelableExtra("statusBarNotification");
-                    String key = statusBarNotification.getKey();
-                    String title = statusBarNotification.getNotification().extras.getString("android.title");
-                    String text = statusBarNotification.getNotification().extras.getString("android.text");
+                    String key = intent.getStringExtra("key");
+                    String title = intent.getStringExtra("title");
+                    String text = intent.getStringExtra("text");
                     sendMessage("1;" + key + ";" + title + ";" + text);
                     break;
                 }
                 case Constants.NOTIFICATION_LISTENER_REMOVED_ACTION: {
-                    StatusBarNotification statusBarNotification = intent.getParcelableExtra("statusBarNotification");
-                    String key = statusBarNotification.getKey();
+                    String key = intent.getStringExtra("key");
                     sendMessage("0;" + key);
                     break;
                 }
@@ -168,7 +166,6 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
     @Override
     public void onViewCreated(View view, @Nullable Bundle savedInstanceState) {
         mConversationView = (ListView) view.findViewById(R.id.in);
-        mTestSendButton = (Button) view.findViewById(R.id.button_send_test);
         mServiceStopButton = (Button) view.findViewById(R.id.button_service_stop);
     }
 
@@ -200,17 +197,6 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
         mConversationArrayAdapter = new ArrayAdapter<>(getActivity(), R.layout.message);
 
         mConversationView.setAdapter(mConversationArrayAdapter);
-
-        // Initialize the send button with a listener that for click events
-        mTestSendButton.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                // Send a message using content of the edit text widget
-                View view = getView();
-                if (null != view) {
-                    sendMessage("TESTAS");
-                }
-            }
-        });
 
         mServiceStopButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {

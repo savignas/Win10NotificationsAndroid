@@ -46,4 +46,6 @@
     <string name="pref_title_send_notifications_enabled">Enabled</string>
 
     <string name="pref_title_choose_apps">Choose which apps to send</string>
+
+    <array name="empty_array" />
 </resources>

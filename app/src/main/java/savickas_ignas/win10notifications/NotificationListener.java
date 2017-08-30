@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.preference.PreferenceManager;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
@@ -25,7 +26,13 @@ public class NotificationListener extends NotificationListenerService {
 
             if (action.equals(Constants.NOTIFICATION_LISTENER_CANCELED_ACTION)) {
                 String key = intent.getStringExtra("key");
-                cancelNotification(key);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    cancelNotification(key);
+                }
+                else {
+                    String[] keyParts = key.split("|", -1);
+                    cancelNotification(keyParts[0], keyParts[1], Integer.parseInt(keyParts[2]));
+                }
             }
         }
     };
@@ -73,11 +80,22 @@ public class NotificationListener extends NotificationListenerService {
         Set<String> apps = defaultSharedPreferences.getStringSet("apps_list", null);
         String appPackageName = statusBarNotification.getPackageName();
         if (apps != null) {
-            for (String app: apps)
-            {
+            for (String app: apps) {
                 if (app.equals(appPackageName)) {
                     Intent intent = new Intent(action);
-                    intent.putExtra("statusBarNotification", statusBarNotification);
+                    String key;
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        key = statusBarNotification.getKey();
+                    }
+                    else {
+                        key = statusBarNotification.getPackageName() + "|" +
+                                statusBarNotification.getTag() + "|" +
+                                statusBarNotification.getId();
+                        intent.putExtra("key", key);
+                    }
+                    intent.putExtra("key", key);
+                    intent.putExtra("title", statusBarNotification.getNotification().extras.getString("android.title"));
+                    intent.putExtra("text", statusBarNotification.getNotification().extras.getString("android.text"));
                     sendBroadcast(intent);
                     break;
                 }

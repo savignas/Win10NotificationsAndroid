@@ -11,6 +11,7 @@
     <MultiSelectListPreference
         android:dependency="send_notifications_enabled"
         android:key="apps_list"
-        android:title="@string/pref_title_choose_apps" />
+        android:title="@string/pref_title_choose_apps"
+        android:defaultValue="@array/empty_array"/>
 
 </PreferenceScreen>

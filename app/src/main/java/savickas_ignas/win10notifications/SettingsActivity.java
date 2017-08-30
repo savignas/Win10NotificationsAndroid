@@ -271,8 +271,15 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
         }
 
         @Override
-        public void onDestroy()
-        {
+        public void onResume() {
+            super.onResume();
+            boolean state = sharedPreferences.getBoolean("NOTIFICATION_LISTENER", false);
+            SwitchPreference switchPreference = (SwitchPreference) findPreference("send_notifications_enabled");
+            switchPreference.setChecked(state);
+        }
+
+        @Override
+        public void onDestroy() {
             super.onDestroy();
             getActivity().unregisterReceiver(mNotificationListenerState);
         }
