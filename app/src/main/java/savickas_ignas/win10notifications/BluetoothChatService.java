@@ -244,7 +244,7 @@ public class BluetoothChatService extends Service {
         mConnectedDeviceName = device.getName();
 
         updateUserInterfaceTitle();
-        showNotification(getString(R.string.app_name), Constants.INFO_NOTIFICATION_ID, getString(R.string.title_connected_to, mConnectedDeviceName), Notification.PRIORITY_MIN);
+        showNotification(getString(R.string.app_name), Constants.INFO_NOTIFICATION_ID, getString(R.string.title_connected_to, mConnectedDeviceName), getString(R.string.app_name), Notification.PRIORITY_MIN);
         dismissNotification();
     }
 
@@ -322,7 +322,7 @@ public class BluetoothChatService extends Service {
 
         mState = STATE_NONE;
         updateUserInterfaceTitle();
-        showNotification(getString(R.string.app_name), Constants.INFO_NOTIFICATION_ID, getString(R.string.title_disconnected_from, mConnectedDeviceName), Notification.PRIORITY_MIN);
+        showNotification(getString(R.string.app_name), Constants.INFO_NOTIFICATION_ID, getString(R.string.title_disconnected_from, mConnectedDeviceName), getString(R.string.app_name), Notification.PRIORITY_MIN);
         dismissNotification();
 
         // Start the service over to restart listening mode
@@ -548,7 +548,7 @@ public class BluetoothChatService extends Service {
     /**
      * Send a sample notification using the NotificationCompat API.
      */
-    public void showNotification(String title, int notificationId, String text, int priority) {
+    public void showNotification(String title, int notificationId, String text, String appName, int priority) {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this);
         if (priority != Notification.PRIORITY_MIN)
         {
@@ -561,6 +561,7 @@ public class BluetoothChatService extends Service {
         builder.setSmallIcon(R.drawable.ic_notification);
         builder.setContentTitle(title);
         builder.setContentText(text);
+        builder.setSubText(appName);
         builder.setColor(ContextCompat.getColor(this, R.color.colorPrimary));
         builder.setLights(WHITE, 1000, 1000);
         builder.setAutoCancel(true);

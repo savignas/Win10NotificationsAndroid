@@ -5,6 +5,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.preference.PreferenceManager;
 import android.service.notification.NotificationListenerService;
@@ -18,6 +20,7 @@ public class NotificationListener extends NotificationListenerService {
 
     private SharedPreferences sharedPreferences;
     private SharedPreferences defaultSharedPreferences;
+    private PackageManager packageManager;
 
     private final BroadcastReceiver mNotificationCancel = new BroadcastReceiver() {
         @Override
@@ -42,6 +45,7 @@ public class NotificationListener extends NotificationListenerService {
         super.onCreate();
         sharedPreferences = getSharedPreferences("DEVICE", Context.MODE_PRIVATE);
         defaultSharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        packageManager = getPackageManager();
         registerReceiver(mNotificationCancel, new IntentFilter(Constants.NOTIFICATION_LISTENER_CANCELED_ACTION));
         Toast.makeText(this, "Notification listener started", Toast.LENGTH_SHORT).show();
         SharedPreferences.Editor editor = sharedPreferences.edit();
@@ -83,17 +87,25 @@ public class NotificationListener extends NotificationListenerService {
             for (String app: apps) {
                 if (app.equals(appPackageName)) {
                     Intent intent = new Intent(action);
+                    String packageName = statusBarNotification.getPackageName();
                     String key;
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                         key = statusBarNotification.getKey();
                     }
                     else {
-                        key = statusBarNotification.getPackageName() + "|" +
+                        key = packageName + "|" +
                                 statusBarNotification.getTag() + "|" +
                                 statusBarNotification.getId();
                         intent.putExtra("key", key);
                     }
+                    ApplicationInfo applicationInfo;
+                    CharSequence appName = "";
+                    try {
+                        applicationInfo = packageManager.getApplicationInfo(packageName, 0);
+                        appName = packageManager.getApplicationLabel(applicationInfo);
+                    } catch (PackageManager.NameNotFoundException ignored) {}
                     intent.putExtra("key", key);
+                    intent.putExtra("appName", appName);
                     intent.putExtra("title", statusBarNotification.getNotification().extras.getString("android.title"));
                     intent.putExtra("text", statusBarNotification.getNotification().extras.getString("android.text"));
                     sendBroadcast(intent);

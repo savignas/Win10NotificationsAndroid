@@ -87,9 +87,10 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
             switch (action) {
                 case Constants.NOTIFICATION_LISTENER_POSTED_ACTION: {
                     String key = intent.getStringExtra("key");
+                    CharSequence appName = intent.getCharSequenceExtra("appName");
                     String title = intent.getStringExtra("title");
                     String text = intent.getStringExtra("text");
-                    sendMessage("1;" + key + ";" + title + ";" + text);
+                    sendMessage("1;" + key + ";" + appName + ";" + title + ";" + text);
                     break;
                 }
                 case Constants.NOTIFICATION_LISTENER_REMOVED_ACTION: {
@@ -362,10 +363,10 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                     mConversationArrayAdapter.add(mConnectedDeviceName + ": " + readMessage);
                     if (Objects.equals(messageParts[0], "1")) {
                         if (!Objects.equals(messageParts[4], "")) {
-                            mChatService.showNotification(messageParts[3], Integer.parseInt(messageParts[1]), messageParts[4], Notification.PRIORITY_DEFAULT);
+                            mChatService.showNotification(messageParts[3], Integer.parseInt(messageParts[1]), messageParts[4], messageParts[2], Notification.PRIORITY_DEFAULT);
                         }
                         else {
-                            mChatService.showNotification(messageParts[2], Integer.parseInt(messageParts[1]), messageParts[3], Notification.PRIORITY_DEFAULT);
+                            mChatService.showNotification(messageParts[2], Integer.parseInt(messageParts[1]), messageParts[3], messageParts[2], Notification.PRIORITY_DEFAULT);
                         }
                     }
                     else if (Objects.equals(messageParts[0], "0")) {
