@@ -44,7 +44,7 @@ public class BluetoothChatService extends Service {
     private String mConnectedDeviceName = null;
     private NotificationManager notificationManager;
     private BluetoothDevice device;
-    private boolean connected = false;
+    private boolean wasConnected = false;
     private boolean connecting = false;
     private boolean notConnected = true;
     private final Handler handlerReconnect = new Handler();
@@ -75,7 +75,7 @@ public class BluetoothChatService extends Service {
                     case  BluetoothAdapter.STATE_ON:
                         mState = STATE_NONE;
                         start();
-                        if (connected)
+                        if (wasConnected)
                         {
                             connect(device);
                         }
@@ -97,7 +97,6 @@ public class BluetoothChatService extends Service {
     }
 
     private synchronized void updateUserInterfaceTitle() {
-        mState = getState();
         mNewState = mState;
 
         if (mHandler != null) {
@@ -110,7 +109,7 @@ public class BluetoothChatService extends Service {
                 connecting = false;
                 break;
             case STATE_CONNECTING:
-                if (!connecting && connected)
+                if (!connecting && wasConnected)
                 {
                     setForegroundNotification(getString(R.string.title_connecting));
                     connecting = true;
@@ -118,12 +117,12 @@ public class BluetoothChatService extends Service {
                 break;
             case STATE_LISTEN:
             case STATE_NONE:
-                if (!connecting && !connected && notConnected)
+                if (!connecting && !wasConnected && notConnected)
                 {
                     setForegroundNotification(getString(R.string.title_not_connected));
                     notConnected = false;
                 }
-                else if (connected && !connecting)
+                else if (wasConnected && !connecting)
                 {
                     setForegroundNotification(getString(R.string.title_connecting));
                     connecting = true;
@@ -142,13 +141,11 @@ public class BluetoothChatService extends Service {
         return mState;
     }
 
-    public synchronized void setConnected(boolean connected)
-    {
-        this.connected = connected;
+    public synchronized void setWasConnected(boolean wasConnected) {
+        this.wasConnected = wasConnected;
     }
 
-    public synchronized void setNotConnected(boolean notConnected)
-    {
+    public synchronized void setNotConnected(boolean notConnected) {
         this.notConnected = notConnected;
     }
 
@@ -185,7 +182,7 @@ public class BluetoothChatService extends Service {
     public synchronized void connect(BluetoothDevice device) {
 
         // Cancel any thread attempting to make a connection
-        if (getState() == STATE_CONNECTING) {
+        if (mState == STATE_CONNECTING) {
             if (mConnectThread != null) {
                 mConnectThread.cancel();
                 mConnectThread = null;
@@ -230,7 +227,7 @@ public class BluetoothChatService extends Service {
         // Start the thread to manage the connection and perform transmissions
         mConnectedThread = new ConnectedThread(socket);
         mConnectedThread.start();
-        connected = true;
+        wasConnected = true;
 
         if (mHandler != null) {
             // Send the name of the connected device back to the UI Activity
@@ -296,7 +293,7 @@ public class BluetoothChatService extends Service {
         // Start the service over to restart listening mode
         BluetoothChatService.this.start();
 
-        if (connected && getState() != STATE_NO_BLUETOOTH)
+        if (wasConnected && mState != STATE_NO_BLUETOOTH)
         {
             handlerReconnect.postDelayed(new Runnable() {
                 @Override
@@ -328,7 +325,7 @@ public class BluetoothChatService extends Service {
         // Start the service over to restart listening mode
         BluetoothChatService.this.start();
 
-        if (connected && getState() != STATE_NO_BLUETOOTH)
+        if (wasConnected && mState != STATE_NO_BLUETOOTH)
         {
             handlerReconnect.postDelayed(new Runnable() {
                 @Override
@@ -431,7 +428,7 @@ public class BluetoothChatService extends Service {
             int bytes;
 
             // Keep listening to the InputStream while connected
-            while (BluetoothChatService.this.getState() == STATE_CONNECTED) {
+            while (mState == STATE_CONNECTED) {
                 try {
                     // Read from the InputStream
                     bytes = mmInStream.read(buffer);

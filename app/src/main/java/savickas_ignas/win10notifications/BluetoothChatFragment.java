@@ -11,12 +11,10 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
-import android.service.notification.StatusBarNotification;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentActivity;
@@ -208,7 +206,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                         stopIntent.setAction(Constants.STOP_FOREGROUND_ACTION);
                         getActivity().startService(stopIntent);
                         mChatService.stop();
-                        mChatService.setConnected(false);
+                        mChatService.setWasConnected(false);
                         mChatService.setNotConnected(true);
                         getActivity().unbindService(BluetoothChatFragment.this);
                         mChatService = null;
@@ -475,7 +473,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                     if (mChatService != null) {
                         mChatService.stop();
                         connected = false;
-                        mChatService.setConnected(false);
+                        mChatService.setWasConnected(false);
                         mChatService.setNotConnected(true);
                     }
                 }
