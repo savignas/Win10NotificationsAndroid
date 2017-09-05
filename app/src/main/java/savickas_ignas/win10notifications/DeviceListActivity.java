@@ -10,8 +10,10 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Build;
-import android.os.Bundle;
 import android.support.annotation.NonNull;
+import android.support.v7.app.ActionBar;
+import android.support.v7.app.AppCompatActivity;
+import android.os.Bundle;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -22,7 +24,7 @@ import android.widget.TextView;
 
 import java.util.Set;
 
-public class DeviceListActivity extends Activity {
+public class DeviceListActivity extends AppCompatActivity {
 
     /**
      * Return Intent extra
@@ -46,9 +48,10 @@ public class DeviceListActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        // Setup the window
         setContentView(R.layout.activity_device_list);
+
+        setTitle(R.string.bluetooth_devices);
+        setStatus(R.string.select_device);
 
         // Set result CANCELED in case the user backs out
         setResult(Activity.RESULT_CANCELED);
@@ -56,20 +59,27 @@ public class DeviceListActivity extends Activity {
         // Initialize the button to perform device discovery
         scanButton = (Button) findViewById(R.id.button_scan);
         progressBar = (ProgressBar) findViewById(R.id.progress);
+        progressBar.setVisibility(View.GONE);
         scanButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
-                            != PackageManager.PERMISSION_GRANTED) {
-                        requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
-                                Constants.MY_PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION);
-                    } else {
-                        doDiscovery();
-                        v.setVisibility(View.GONE);
-                    }
+                if (mBtAdapter.isDiscovering()) {
+                    mBtAdapter.cancelDiscovery();
                 } else {
-                    doDiscovery();
-                    v.setVisibility(View.GONE);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+                                != PackageManager.PERMISSION_GRANTED) {
+                            requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
+                                    Constants.MY_PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION);
+                        } else {
+                            mNewDevicesArrayAdapter.clear();
+                            doDiscovery();
+                            scanButton.setText(R.string.button_cancel);
+                        }
+                    } else {
+                        mNewDevicesArrayAdapter.clear();
+                        doDiscovery();
+                        scanButton.setText(R.string.button_cancel);
+                    }
                 }
             }
         });
@@ -125,8 +135,9 @@ public class DeviceListActivity extends Activity {
                         && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     // permission was granted, yay! Do the
                     // contacts-related task you need to do.
+                    mNewDevicesArrayAdapter.clear();
                     doDiscovery();
-                    scanButton.setVisibility(View.GONE);
+                    scanButton.setText(R.string.button_cancel);
                 } else {
 
                     // permission denied, boo! Disable the
@@ -153,6 +164,14 @@ public class DeviceListActivity extends Activity {
         this.unregisterReceiver(mReceiver);
     }
 
+    private void setStatus(int resId) {
+        final ActionBar actionBar = getSupportActionBar();
+        if (null == actionBar) {
+            return;
+        }
+        actionBar.setSubtitle(resId);
+    }
+
     /**
      * Start device discover with the BluetoothAdapter
      */
@@ -160,7 +179,7 @@ public class DeviceListActivity extends Activity {
 
         // Indicate scanning in the title
         progressBar.setVisibility(View.VISIBLE);
-        setTitle(R.string.scanning);
+        setStatus(R.string.scanning);
 
         // Turn on sub-title for new devices
         findViewById(R.id.title_new_devices).setVisibility(View.VISIBLE);
@@ -219,7 +238,8 @@ public class DeviceListActivity extends Activity {
                 // When discovery is finished, change the Activity title
             } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
                 progressBar.setVisibility(View.GONE);
-                setTitle(R.string.select_device);
+                scanButton.setText(R.string.button_scan);
+                setStatus(R.string.select_device);
                 if (mNewDevicesArrayAdapter.getCount() == 0) {
                     String noDevices = getResources().getText(R.string.none_found).toString();
                     mNewDevicesArrayAdapter.add(noDevices);
@@ -227,5 +247,4 @@ public class DeviceListActivity extends Activity {
             }
         }
     };
-
 }
