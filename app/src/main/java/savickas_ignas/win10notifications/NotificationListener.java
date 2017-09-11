@@ -81,35 +81,37 @@ public class NotificationListener extends NotificationListenerService {
 
     private void sendNotification(StatusBarNotification statusBarNotification, String action)
     {
-        Set<String> apps = defaultSharedPreferences.getStringSet("apps_list", null);
-        String appPackageName = statusBarNotification.getPackageName();
-        if (apps != null) {
-            for (String app: apps) {
-                if (app.equals(appPackageName)) {
-                    Intent intent = new Intent(action);
-                    String packageName = statusBarNotification.getPackageName();
-                    String key;
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                        key = statusBarNotification.getKey();
-                    }
-                    else {
-                        key = packageName + "|" +
-                                statusBarNotification.getTag() + "|" +
-                                statusBarNotification.getId();
+        if (statusBarNotification.getNotification().extras.getString("android.text") != null) {
+            Set<String> apps = defaultSharedPreferences.getStringSet("apps_list", null);
+            String appPackageName = statusBarNotification.getPackageName();
+            if (apps != null) {
+                for (String app: apps) {
+                    if (app.equals(appPackageName)) {
+                        Intent intent = new Intent(action);
+                        String packageName = statusBarNotification.getPackageName();
+                        String key;
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            key = statusBarNotification.getKey();
+                        }
+                        else {
+                            key = packageName + "|" +
+                                    statusBarNotification.getTag() + "|" +
+                                    statusBarNotification.getId();
+                            intent.putExtra("key", key);
+                        }
+                        ApplicationInfo applicationInfo;
+                        CharSequence appName = "";
+                        try {
+                            applicationInfo = packageManager.getApplicationInfo(packageName, 0);
+                            appName = packageManager.getApplicationLabel(applicationInfo);
+                        } catch (PackageManager.NameNotFoundException ignored) {}
                         intent.putExtra("key", key);
+                        intent.putExtra("appName", appName);
+                        intent.putExtra("title", statusBarNotification.getNotification().extras.getString("android.title"));
+                        intent.putExtra("text", statusBarNotification.getNotification().extras.getString("android.text"));
+                        sendBroadcast(intent);
+                        break;
                     }
-                    ApplicationInfo applicationInfo;
-                    CharSequence appName = "";
-                    try {
-                        applicationInfo = packageManager.getApplicationInfo(packageName, 0);
-                        appName = packageManager.getApplicationLabel(applicationInfo);
-                    } catch (PackageManager.NameNotFoundException ignored) {}
-                    intent.putExtra("key", key);
-                    intent.putExtra("appName", appName);
-                    intent.putExtra("title", statusBarNotification.getNotification().extras.getString("android.title"));
-                    intent.putExtra("text", statusBarNotification.getNotification().extras.getString("android.text"));
-                    sendBroadcast(intent);
-                    break;
                 }
             }
         }

@@ -1,6 +1,7 @@
 package savickas_ignas.win10notifications;
 
 
+import android.Manifest;
 import android.annotation.TargetApi;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -12,14 +13,13 @@ import android.content.pm.ResolveInfo;
 import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
-import android.preference.ListPreference;
 import android.preference.MultiSelectListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceActivity;
 import android.preference.SwitchPreference;
+import android.support.annotation.NonNull;
 import android.support.v7.app.ActionBar;
 import android.preference.PreferenceFragment;
-import android.preference.PreferenceManager;
 import android.view.MenuItem;
 import android.support.v4.app.NavUtils;
 
@@ -48,37 +48,8 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
         Intent intent = new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS");
         context.startActivity(intent);
     }
-    /**
-     * A preference value change listener that updates the preference's summary
-     * to reflect its new value.
-     */
-    private static Preference.OnPreferenceChangeListener sBindPreferenceSummaryToValueListener = new Preference.OnPreferenceChangeListener() {
-        @Override
-        public boolean onPreferenceChange(Preference preference, Object value) {
-            String stringValue = value.toString();
 
-            if (preference instanceof ListPreference) {
-                // For list preferences, look up the correct display value in
-                // the preference's 'entries' list.
-                ListPreference listPreference = (ListPreference) preference;
-                int index = listPreference.findIndexOfValue(stringValue);
-
-                // Set the summary to reflect the new value.
-                preference.setSummary(
-                        index >= 0
-                                ? listPreference.getEntries()[index]
-                                : null);
-
-            } else {
-                // For all other preferences, set the summary to the value's
-                // simple string representation.
-                preference.setSummary(stringValue);
-            }
-            return true;
-        }
-    };
-
-    private static Preference.OnPreferenceChangeListener sPreferenceChangeListener = new Preference.OnPreferenceChangeListener() {
+    private static Preference.OnPreferenceChangeListener sSendNotificationsPreferenceChangeListener = new Preference.OnPreferenceChangeListener() {
         @Override
         public boolean onPreferenceChange(Preference preference, Object value) {
             goToNotificationListenerSettings(preference.getContext());
@@ -101,13 +72,11 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
      * preference title) is updated to reflect the value. The summary is also
      * immediately updated upon calling this method. The exact display format is
      * dependent on the type of preference.
-     *
-     * @see #sBindPreferenceSummaryToValueListener
      */
 
     private static void preferenceChangeListener(Preference preference) {
         // Set the listener to watch for value changes.
-        preference.setOnPreferenceChangeListener(sPreferenceChangeListener);
+        preference.setOnPreferenceChangeListener(sSendNotificationsPreferenceChangeListener);
     }
 
     @Override
@@ -197,6 +166,8 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
      */
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     public static class SendNotificationsPreferenceFragment extends PreferenceFragment {
+        private SwitchPreference readSMSSwitchPreference;
+
         private final BroadcastReceiver mNotificationListenerState = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -218,15 +189,37 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
             getActivity().registerReceiver(mNotificationListenerState, new IntentFilter(Constants.NOTIFICATION_LISTENER_STATE));
 
             boolean state = sharedPreferences.getBoolean("NOTIFICATION_LISTENER", false);
-            SwitchPreference switchPreference = (SwitchPreference) findPreference("send_notifications_enabled");
-            switchPreference.setChecked(state);
+            SwitchPreference sendNotificationsSwitchPreference = (SwitchPreference) findPreference("send_notifications_enabled");
+            sendNotificationsSwitchPreference.setChecked(state);
 
-            preferenceChangeListener(switchPreference);
+            readSMSSwitchPreference = (SwitchPreference) findPreference("read_sms_enabled");
+
+            readSMSSwitchPreference.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+                @Override
+                public boolean onPreferenceChange(Preference preference, Object newValue) {
+                    if ((boolean) newValue) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            if (preference.getContext().checkSelfPermission(Manifest.permission.RECEIVE_SMS)
+                                    != PackageManager.PERMISSION_GRANTED ||
+                                    preference.getContext().checkSelfPermission(Manifest.permission.READ_CONTACTS)
+                                            != PackageManager.PERMISSION_GRANTED) {
+                                final String[] permissions = new String[] {Manifest.permission.RECEIVE_SMS, Manifest.permission.READ_CONTACTS};
+                                requestPermissions(permissions,
+                                        Constants.MY_PERMISSIONS_RECEIVE_SMS);
+                                return false;
+                            }
+                        }
+                    }
+                    return true;
+                }
+            });
+
+            preferenceChangeListener(sendNotificationsSwitchPreference);
 
             final PackageManager pm = getActivity().getPackageManager();
             Intent intent = new Intent(Intent.ACTION_MAIN, null);
             intent.addCategory(Intent.CATEGORY_LAUNCHER);
-            List<ResolveInfo> apps = pm.queryIntentActivities(intent, PackageManager.GET_META_DATA);
+            final List<ResolveInfo> apps = pm.queryIntentActivities(intent, PackageManager.GET_META_DATA);
             Collections.sort(apps, new Comparator<ResolveInfo>() {
                 @Override
                 public int compare(ResolveInfo o1, ResolveInfo o2) {
@@ -274,6 +267,26 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
                 return true;
             }
             return super.onOptionsItemSelected(item);
+        }
+
+        @Override
+        public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
+            switch (requestCode) {
+                case Constants.MY_PERMISSIONS_RECEIVE_SMS: {
+                    // If request is cancelled, the result arrays are empty.
+                    if (grantResults.length > 0
+                            && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                        // permission was granted, yay! Do the
+                        // contacts-related task you need to do.
+                        readSMSSwitchPreference.setChecked(true);
+                    } else {
+                        readSMSSwitchPreference.setChecked(false);
+                    }
+                }
+
+                // other 'case' lines to check for other
+                // permissions this app might request
+            }
         }
     }
 }

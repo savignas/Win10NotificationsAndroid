@@ -28,4 +28,5 @@ public interface Constants {
     public static final String NOTIFICATION_LISTENER_STATE = "win10notifications.NOTIFICATION_LISTENER_STATE";
 
     public static final int MY_PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION = 10;
+    public static final int MY_PERMISSIONS_RECEIVE_SMS = 11;
 }

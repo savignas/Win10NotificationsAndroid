@@ -138,11 +138,6 @@ public class DeviceListActivity extends AppCompatActivity {
                     mNewDevicesArrayAdapter.clear();
                     doDiscovery();
                     scanButton.setText(R.string.button_cancel);
-                } else {
-
-                    // permission denied, boo! Disable the
-                    // functionality that depends on this permission.
-                    scanButton.setEnabled(false);
                 }
             }
 

@@ -7,11 +7,15 @@
         android:key="send_notifications_enabled"
         android:title="@string/pref_title_send_notifications_enabled"/>
 
-    <!-- NOTE: This preference will be enabled only when the checkbox above is checked. -->
     <MultiSelectListPreference
         android:dependency="send_notifications_enabled"
         android:key="apps_list"
         android:title="@string/pref_title_choose_apps"
         android:defaultValue="@array/empty_array"/>
+
+    <SwitchPreference
+        android:defaultValue="false"
+        android:key="read_sms_enabled"
+        android:title="@string/pref_title_read_sms_enabled" />
 
 </PreferenceScreen>
