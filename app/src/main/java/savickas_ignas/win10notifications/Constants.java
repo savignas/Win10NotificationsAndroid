@@ -24,7 +24,9 @@ public interface Constants {
     public static final String NOTIFICATION_DELETED_ACTION = "win10notifications.NOTIFICATION_DELETED";
     public static final String NOTIFICATION_LISTENER_POSTED_ACTION = "win10notifications.NOTIFICATION_LISTENER_POSTED";
     public static final String NOTIFICATION_LISTENER_REMOVED_ACTION = "win10notifications.NOTIFICATION_LISTENER_REMOVED";
+    public static final String NOTIFICATION_LISTENER_CHANGED_ACTION = "win10notifications.NOTIFICATION_LISTENER_CHANGED";
     public static final String NOTIFICATION_LISTENER_CANCELED_ACTION = "win10notifications.NOTIFICATION_LISTENER_CANCELED";
+    public static final String NOTIFICATION_LISTENER_GET_ALL_ACTION = "win10notifications.NOTIFICATION_LISTENER_GET_ALL";
     public static final String NOTIFICATION_LISTENER_STATE = "win10notifications.NOTIFICATION_LISTENER_STATE";
 
     public static final int MY_PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION = 10;
