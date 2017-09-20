@@ -49,6 +49,7 @@ public class BluetoothChatService extends Service {
     private boolean notConnected = true;
     private final Handler handlerReconnect = new Handler();
     private final Handler handlerNotification = new Handler();
+    private BroadcastReceiver fragmentReceiver;
 
     // Constants that indicate the current connection state
     public static final int STATE_NONE = 0;       // we're doing nothing
@@ -94,6 +95,14 @@ public class BluetoothChatService extends Service {
         mAdapter = BluetoothAdapter.getDefaultAdapter();
         mState = STATE_NONE;
         mNewState = mState;
+    }
+
+    public BroadcastReceiver getFragmentReceiver() {
+        return fragmentReceiver;
+    }
+
+    public void setFragmentReceiver(BroadcastReceiver receiver) {
+        this.fragmentReceiver = receiver;
     }
 
     private synchronized void updateUserInterfaceTitle() {

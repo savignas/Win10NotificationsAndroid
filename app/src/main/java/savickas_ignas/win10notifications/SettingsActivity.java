@@ -167,6 +167,7 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     public static class SendNotificationsPreferenceFragment extends PreferenceFragment {
         private SwitchPreference readSMSSwitchPreference;
+        private SwitchPreference readStateSwitchPreference;
 
         private final BroadcastReceiver mNotificationListenerState = new BroadcastReceiver() {
             @Override
@@ -203,9 +204,33 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
                                     != PackageManager.PERMISSION_GRANTED ||
                                     preference.getContext().checkSelfPermission(Manifest.permission.READ_CONTACTS)
                                             != PackageManager.PERMISSION_GRANTED) {
-                                final String[] permissions = new String[] {Manifest.permission.RECEIVE_SMS, Manifest.permission.READ_CONTACTS};
+                                final String[] permissions = new String[] {Manifest.permission.RECEIVE_SMS,
+                                        Manifest.permission.READ_CONTACTS};
                                 requestPermissions(permissions,
                                         Constants.MY_PERMISSIONS_RECEIVE_SMS);
+                                return false;
+                            }
+                        }
+                    }
+                    return true;
+                }
+            });
+
+            readStateSwitchPreference = (SwitchPreference) findPreference("read_state_enabled");
+
+            readStateSwitchPreference.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+                @Override
+                public boolean onPreferenceChange(Preference preference, Object newValue) {
+                    if ((boolean) newValue) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            if (preference.getContext().checkSelfPermission(Manifest.permission.READ_PHONE_STATE)
+                                    != PackageManager.PERMISSION_GRANTED ||
+                                    preference.getContext().checkSelfPermission(Manifest.permission.READ_CONTACTS)
+                                            != PackageManager.PERMISSION_GRANTED) {
+                                final String[] permissions = new String[] {Manifest.permission.READ_PHONE_STATE,
+                                        Manifest.permission.READ_CONTACTS};
+                                requestPermissions(permissions,
+                                        Constants.MY_PERMISSIONS_INCOMING_CALL);
                                 return false;
                             }
                         }
@@ -282,6 +307,18 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
                     } else {
                         readSMSSwitchPreference.setChecked(false);
                     }
+                    break;
+                }
+                case Constants.MY_PERMISSIONS_INCOMING_CALL: {
+                    if (grantResults.length > 0
+                            && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                        // permission was granted, yay! Do the
+                        // contacts-related task you need to do.
+                        readStateSwitchPreference.setChecked(true);
+                    } else {
+                        readStateSwitchPreference.setChecked(false);
+                    }
+                    break;
                 }
 
                 // other 'case' lines to check for other

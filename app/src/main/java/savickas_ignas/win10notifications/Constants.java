@@ -31,4 +31,5 @@ public interface Constants {
 
     public static final int MY_PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION = 10;
     public static final int MY_PERMISSIONS_RECEIVE_SMS = 11;
+    public static final int MY_PERMISSIONS_INCOMING_CALL = 12;
 }

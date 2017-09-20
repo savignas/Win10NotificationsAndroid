@@ -18,6 +18,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
+import android.preference.PreferenceManager;
 import android.provider.ContactsContract;
 import android.provider.Telephony;
 import android.support.annotation.Nullable;
@@ -27,6 +28,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.app.ActionBar;
 import android.telephony.SmsManager;
 import android.telephony.SmsMessage;
+import android.telephony.TelephonyManager;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -38,6 +40,7 @@ import android.widget.Button;
 import android.widget.ListView;
 import android.widget.Toast;
 
+import java.lang.reflect.Method;
 import java.util.Objects;
 
 /**
@@ -82,7 +85,12 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
 
     private boolean connected = false;
 
-    SharedPreferences sharedPreferences;
+    private SharedPreferences sharedPreferences;
+    private SharedPreferences defaultSharedPreferences;
+
+    private String callerPhoneNumber;
+
+    private boolean serviceBound;
 
     private final BroadcastReceiver mNotificationAction = new BroadcastReceiver() {
         @Override
@@ -110,14 +118,36 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                     break;
                 }
                 case Telephony.Sms.Intents.SMS_RECEIVED_ACTION: {
-                    Bundle bundle = intent.getExtras();
-                    if (bundle != null) {
-                        SmsMessage[] messages = Telephony.Sms.Intents.getMessagesFromIntent(intent);
-                        for (SmsMessage currentMessage : messages) {
-                            String phoneNumber = currentMessage.getDisplayOriginatingAddress();
-                            String message = currentMessage.getDisplayMessageBody();
-                            String contactName = getContactName(context, phoneNumber);
-                            sendMessage("1;" + phoneNumber + ";" + contactName + ";" + message);
+                    boolean readSmsEnabled = defaultSharedPreferences.getBoolean("read_sms_enabled", false);
+                    if (readSmsEnabled) {
+                        Bundle bundle = intent.getExtras();
+                        if (bundle != null) {
+                            SmsMessage[] messages = Telephony.Sms.Intents.getMessagesFromIntent(intent);
+                            for (SmsMessage currentMessage : messages) {
+                                String phoneNumber = currentMessage.getDisplayOriginatingAddress();
+                                String message = currentMessage.getDisplayMessageBody();
+                                String contactName = getContactName(context, phoneNumber);
+                                sendMessage("1;" + phoneNumber + "_sms" + ";" + contactName + ";" + message);
+                            }
+                        }
+                    }
+                }
+                case "android.intent.action.PHONE_STATE": {
+                    boolean readStateEnabled = defaultSharedPreferences.getBoolean("read_state_enabled", false);
+                    if (readStateEnabled) {
+                        String state = intent.getStringExtra(TelephonyManager.EXTRA_STATE);
+                        if (state != null && state.equals(TelephonyManager.EXTRA_STATE_RINGING)) {
+                            callerPhoneNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER);
+                            String contactName = getContactName(context, callerPhoneNumber);
+                            sendMessage("1;" + callerPhoneNumber + "_call" + ";" + contactName);
+                        } else if (state != null && state.equals(TelephonyManager.EXTRA_STATE_IDLE)) {
+                            if (callerPhoneNumber != null) {
+                                sendMessage("0;" + callerPhoneNumber + "_call");
+                                callerPhoneNumber = null;
+                            }
+                        } else if (state != null && state.equals(TelephonyManager.EXTRA_STATE_OFFHOOK)) {
+                            sendMessage("0;" + callerPhoneNumber + "_call");
+                            callerPhoneNumber = null;
                         }
                     }
                 }
@@ -129,6 +159,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         sharedPreferences = getActivity().getSharedPreferences("DEVICE", Context.MODE_PRIVATE);
+        defaultSharedPreferences = PreferenceManager.getDefaultSharedPreferences(getActivity());
         setHasOptionsMenu(true);
         // Get local Bluetooth adapter
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -159,6 +190,10 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
     @Override
     public void onDestroy() {
         super.onDestroy();
+        if (serviceBound) {
+            getActivity().unbindService(BluetoothChatFragment.this);
+            serviceBound = false;
+        }
     }
 
     @Override
@@ -196,19 +231,25 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
             mChatService = myBinder.getService();
             mChatService.setHandler(mHandler);
             mChatService.start();
-            IntentFilter intentFilter = new IntentFilter();
-            intentFilter.addAction(Constants.NOTIFICATION_LISTENER_POSTED_ACTION);
-            intentFilter.addAction(Constants.NOTIFICATION_LISTENER_REMOVED_ACTION);
-            intentFilter.addAction(Constants.NOTIFICATION_DELETED_ACTION);
-            intentFilter.addAction(Telephony.Sms.Intents.SMS_RECEIVED_ACTION);
-            mChatService.registerReceiver(mNotificationAction, intentFilter);
+            if (mChatService.getFragmentReceiver() == null) {
+                IntentFilter intentFilter = new IntentFilter();
+                intentFilter.addAction(Constants.NOTIFICATION_LISTENER_POSTED_ACTION);
+                intentFilter.addAction(Constants.NOTIFICATION_LISTENER_REMOVED_ACTION);
+                intentFilter.addAction(Constants.NOTIFICATION_DELETED_ACTION);
+                intentFilter.addAction(Telephony.Sms.Intents.SMS_RECEIVED_ACTION);
+                intentFilter.addAction("android.intent.action.PHONE_STATE");
+                mChatService.registerReceiver(mNotificationAction, intentFilter);
+                mChatService.setFragmentReceiver(mNotificationAction);
+            }
+
         }
     }
 
     @Override
     public void onServiceDisconnected(ComponentName name) {
         if (mChatService != null) {
-            mChatService.unregisterReceiver(mNotificationAction);
+            BroadcastReceiver receiver = mChatService.getFragmentReceiver();
+            mChatService.unregisterReceiver(receiver);
             mChatService = null;
         }
     }
@@ -228,14 +269,18 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                 View view = getView();
                 if (null != view) {
                     if (mChatService != null) {
+                        BroadcastReceiver receiver = mChatService.getFragmentReceiver();
+                        mChatService.unregisterReceiver(receiver);
                         Intent stopIntent = new Intent(getActivity(), BluetoothChatService.class);
                         stopIntent.setAction(Constants.STOP_FOREGROUND_ACTION);
                         getActivity().startService(stopIntent);
                         mChatService.stop();
                         mChatService.setWasConnected(false);
                         mChatService.setNotConnected(true);
-                        getActivity().unbindService(BluetoothChatFragment.this);
-                        mChatService.unregisterReceiver(mNotificationAction);
+                        if (serviceBound) {
+                            getActivity().unbindService(BluetoothChatFragment.this);
+                            serviceBound = false;
+                        }
                         mChatService = null;
                         MenuItem item = menu.findItem(R.id.secure_connect);
                         String name = sharedPreferences.getString("DEVICE_NAME", "");
@@ -249,7 +294,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
         // Initialize the BluetoothChatService to perform bluetooth connections
         Intent startIntent = new Intent(getActivity(), BluetoothChatService.class);
         getActivity().startService(startIntent);
-        getActivity().bindService(startIntent, BluetoothChatFragment.this, Context.BIND_AUTO_CREATE);
+        serviceBound = getActivity().bindService(startIntent, BluetoothChatFragment.this, Context.BIND_AUTO_CREATE);
 
         // Initialize the buffer for outgoing messages
         mOutStringBuffer = new StringBuffer("");
@@ -406,7 +451,25 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                         catch (Exception ex) {
                             if (messageParts[1].startsWith("+")) {
                                 SmsManager smsManager = SmsManager.getDefault();
-                                smsManager.sendTextMessage(messageParts[1], null, messageParts[2], null, null);
+                                String phoneNumber = messageParts[1].substring(0, 12);
+                                if (messageParts[1].endsWith("sms")) {
+                                    try {
+                                        smsManager.sendTextMessage(phoneNumber, null, messageParts[2], null, null);
+                                    } catch (Exception ignored) {}
+                                } else if (messageParts[1].endsWith("call")) {
+                                    try {
+                                        TelephonyManager telephonyManager = (TelephonyManager) getContext().getSystemService(Context.TELEPHONY_SERVICE);
+                                        Class<?> telephonyClass = Class.forName(telephonyManager.getClass().getName());
+                                        Method GetITelephonyMethod = telephonyClass.getDeclaredMethod("getITelephony");
+                                        GetITelephonyMethod.setAccessible(true);
+                                        Object telephonyInterface = GetITelephonyMethod.invoke(telephonyManager);
+                                        Class<?> telephonyInterfaceClass = Class.forName(telephonyInterface.getClass().getName());
+                                        Method endCallMethod = telephonyInterfaceClass.getDeclaredMethod("endCall");
+                                        endCallMethod.invoke(telephonyInterface);
+
+                                        smsManager.sendTextMessage(phoneNumber, null, messageParts[2], null, null);
+                                    } catch (Exception ignored) {}
+                                }
                             } else {
                                 Intent intent = new Intent(Constants.NOTIFICATION_LISTENER_CANCELED_ACTION);
                                 intent.putExtra("key", messageParts[1]);
@@ -552,7 +615,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
             }
 
             return contactName;
-        } catch (Exception ignored) {
+        } catch (Exception e) {
             return phoneNumber;
         }
     }

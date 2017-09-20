@@ -18,4 +18,9 @@
         android:key="read_sms_enabled"
         android:title="@string/pref_title_read_sms_enabled" />
 
+    <SwitchPreference
+        android:defaultValue="false"
+        android:key="read_state_enabled"
+        android:title="@string/pref_title_read_state_enabled" />
+
 </PreferenceScreen>
