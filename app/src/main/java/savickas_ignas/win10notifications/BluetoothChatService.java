@@ -50,6 +50,7 @@ public class BluetoothChatService extends Service {
     private final Handler handlerReconnect = new Handler();
     private final Handler handlerNotification = new Handler();
     private BroadcastReceiver fragmentReceiver;
+    private final int reconnectTime = 10000;
 
     // Constants that indicate the current connection state
     public static final int STATE_NONE = 0;       // we're doing nothing
@@ -309,7 +310,7 @@ public class BluetoothChatService extends Service {
                 public void run() {
                     BluetoothChatService.this.connect(device);
                 }
-            }, 5000);
+            }, reconnectTime);
         }
     }
 
@@ -341,7 +342,7 @@ public class BluetoothChatService extends Service {
                 public void run() {
                     BluetoothChatService.this.connect(device);
                 }
-            }, 5000);
+            }, reconnectTime);
         }
     }
 

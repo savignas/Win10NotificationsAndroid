@@ -458,7 +458,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                                     } catch (Exception ignored) {}
                                 } else if (messageParts[1].endsWith("call")) {
                                     try {
-                                        TelephonyManager telephonyManager = (TelephonyManager) getContext().getSystemService(Context.TELEPHONY_SERVICE);
+                                        TelephonyManager telephonyManager = (TelephonyManager) mChatService.getSystemService(Context.TELEPHONY_SERVICE);
                                         Class<?> telephonyClass = Class.forName(telephonyManager.getClass().getName());
                                         Method GetITelephonyMethod = telephonyClass.getDeclaredMethod("getITelephony");
                                         GetITelephonyMethod.setAccessible(true);
