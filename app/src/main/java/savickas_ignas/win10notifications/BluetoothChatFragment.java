@@ -293,8 +293,12 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
 
         // Initialize the BluetoothChatService to perform bluetooth connections
         Intent startIntent = new Intent(getActivity(), BluetoothChatService.class);
-        getActivity().startService(startIntent);
-        serviceBound = getActivity().bindService(startIntent, BluetoothChatFragment.this, Context.BIND_AUTO_CREATE);
+        if (mChatService == null) {
+            getActivity().startService(startIntent);
+        }
+        if (!serviceBound) {
+            serviceBound = getActivity().bindService(startIntent, BluetoothChatFragment.this, Context.BIND_AUTO_CREATE);
+        }
 
         // Initialize the buffer for outgoing messages
         mOutStringBuffer = new StringBuffer("");
@@ -320,8 +324,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
     private void sendMessage(String message) {
         if (mChatService != null) {
             // Check that we're actually connected before trying anything
-            if (mChatService.getState() != BluetoothChatService.STATE_CONNECTED) {
-                Toast.makeText(getActivity(), R.string.not_connected, Toast.LENGTH_SHORT).show();
+            if (!connected) {
                 return;
             }
 
@@ -458,15 +461,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                                     } catch (Exception ignored) {}
                                 } else if (messageParts[1].endsWith("call")) {
                                     try {
-                                        TelephonyManager telephonyManager = (TelephonyManager) mChatService.getSystemService(Context.TELEPHONY_SERVICE);
-                                        Class<?> telephonyClass = Class.forName(telephonyManager.getClass().getName());
-                                        Method GetITelephonyMethod = telephonyClass.getDeclaredMethod("getITelephony");
-                                        GetITelephonyMethod.setAccessible(true);
-                                        Object telephonyInterface = GetITelephonyMethod.invoke(telephonyManager);
-                                        Class<?> telephonyInterfaceClass = Class.forName(telephonyInterface.getClass().getName());
-                                        Method endCallMethod = telephonyInterfaceClass.getDeclaredMethod("endCall");
-                                        endCallMethod.invoke(telephonyInterface);
-
+                                        endCall();
                                         smsManager.sendTextMessage(phoneNumber, null, messageParts[2], null, null);
                                     } catch (Exception ignored) {}
                                 }
@@ -491,6 +486,17 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
             }
         }
     };
+
+    private void endCall() throws Exception {
+        TelephonyManager telephonyManager = (TelephonyManager) mChatService.getSystemService(Context.TELEPHONY_SERVICE);
+        Class<?> telephonyClass = Class.forName(telephonyManager.getClass().getName());
+        Method GetITelephonyMethod = telephonyClass.getDeclaredMethod("getITelephony");
+        GetITelephonyMethod.setAccessible(true);
+        Object telephonyInterface = GetITelephonyMethod.invoke(telephonyManager);
+        Class<?> telephonyInterfaceClass = Class.forName(telephonyInterface.getClass().getName());
+        Method endCallMethod = telephonyInterfaceClass.getDeclaredMethod("endCall");
+        endCallMethod.invoke(telephonyInterface);
+    }
 
     private void getAddress(Intent intent) {
         String address = intent.getStringExtra(DeviceListActivity.EXTRA_DEVICE_ADDRESS);

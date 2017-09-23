@@ -271,6 +271,7 @@ public class BluetoothChatService extends Service {
         }
 
         mState = STATE_NONE;
+        connecting = false;
 
         updateUserInterfaceTitle();
     }
