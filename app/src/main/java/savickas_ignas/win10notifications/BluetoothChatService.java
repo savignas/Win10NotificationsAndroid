@@ -252,7 +252,7 @@ public class BluetoothChatService extends Service {
 
         updateUserInterfaceTitle();
         showNotification(getString(R.string.app_name), Constants.INFO_NOTIFICATION_ID, getString(R.string.title_connected_to, mConnectedDeviceName), getString(R.string.app_name), Notification.PRIORITY_MIN);
-        dismissNotification();
+        dismissNotification(false);
     }
 
     /**
@@ -331,7 +331,7 @@ public class BluetoothChatService extends Service {
         mState = STATE_NONE;
         updateUserInterfaceTitle();
         showNotification(getString(R.string.app_name), Constants.INFO_NOTIFICATION_ID, getString(R.string.title_disconnected_from, mConnectedDeviceName), getString(R.string.app_name), Notification.PRIORITY_MIN);
-        dismissNotification();
+        dismissNotification(true);
 
         // Start the service over to restart listening mode
         BluetoothChatService.this.start();
@@ -577,12 +577,15 @@ public class BluetoothChatService extends Service {
         notificationManager.notify(notificationId, builder.build());
     }
 
-    private void dismissNotification()
+    private void dismissNotification(final boolean removeAll)
     {
         handlerNotification.postDelayed(new Runnable() {
             @Override
             public void run() {
                 cancelNotification(Constants.INFO_NOTIFICATION_ID);
+                if (removeAll) {
+                    notificationManager.cancelAll();
+                }
             }
         }, 5000);
     }

@@ -14,6 +14,7 @@ import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.BatteryManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -41,7 +42,9 @@ import android.widget.ListView;
 import android.widget.Toast;
 
 import java.lang.reflect.Method;
+import java.util.LinkedList;
 import java.util.Objects;
+import java.util.Queue;
 
 /**
  * This fragment controls Bluetooth to communicate with other devices.
@@ -92,6 +95,10 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
 
     private boolean serviceBound;
 
+    private final Handler handlerSendMessage = new Handler();
+
+    private Queue<String> messages = new LinkedList<>();
+
     private final BroadcastReceiver mNotificationAction = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -131,6 +138,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                             }
                         }
                     }
+                    break;
                 }
                 case "android.intent.action.PHONE_STATE": {
                     boolean readStateEnabled = defaultSharedPreferences.getBoolean("read_state_enabled", false);
@@ -150,6 +158,38 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                             callerPhoneNumber = null;
                         }
                     }
+                    break;
+                }
+                case Intent.ACTION_BATTERY_LOW: {
+                    boolean batteryWarningEnabled = defaultSharedPreferences.getBoolean("battery_warning_enabled", false);
+                    if (batteryWarningEnabled) {
+                        sendMessage("1;low_battery;Low Battery;low_battery;Low battery;Your device is on low battery!");
+                    }
+                    break;
+                }
+                case Intent.ACTION_BATTERY_CHANGED: {
+                    boolean batteryWarningEnabled = defaultSharedPreferences.getBoolean("battery_warning_enabled", false);
+                    if (batteryWarningEnabled) {
+                        int status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+                        if (status == BatteryManager.BATTERY_STATUS_FULL) {
+                            sendMessage("1;full_battery;Full Battery;full_battery;Full battery;Your device is fully charged!");
+                        }
+                    }
+                    break;
+                }
+                case Intent.ACTION_POWER_CONNECTED: {
+                    boolean batteryWarningEnabled = defaultSharedPreferences.getBoolean("battery_warning_enabled", false);
+                    if (batteryWarningEnabled) {
+                        sendMessage("0;low_battery");
+                    }
+                    break;
+                }
+                case Intent.ACTION_POWER_DISCONNECTED: {
+                    boolean batteryWarningEnabled = defaultSharedPreferences.getBoolean("battery_warning_enabled", false);
+                    if (batteryWarningEnabled) {
+                        sendMessage("0;full_battery");
+                    }
+                    break;
                 }
             }
         }
@@ -238,6 +278,10 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                 intentFilter.addAction(Constants.NOTIFICATION_DELETED_ACTION);
                 intentFilter.addAction(Telephony.Sms.Intents.SMS_RECEIVED_ACTION);
                 intentFilter.addAction("android.intent.action.PHONE_STATE");
+                intentFilter.addAction(Intent.ACTION_BATTERY_LOW);
+                intentFilter.addAction(Intent.ACTION_BATTERY_CHANGED);
+                intentFilter.addAction(Intent.ACTION_POWER_CONNECTED);
+                intentFilter.addAction(Intent.ACTION_POWER_DISCONNECTED);
                 mChatService.registerReceiver(mNotificationAction, intentFilter);
                 mChatService.setFragmentReceiver(mNotificationAction);
             }
@@ -330,12 +374,13 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
 
             // Check that there's actually something to send
             if (message.length() > 0) {
+                messages.offer(message);
                 // Get the message bytes and tell the BluetoothChatService to write
-                byte[] send = message.getBytes();
-                mChatService.write(send);
+                //byte[] send = message.getBytes();
+                //mChatService.write(send);
 
                 // Reset out string buffer to zero and clear the edit text field
-                mOutStringBuffer.setLength(0);
+                //mOutStringBuffer.setLength(0);
             }
         }
         else {
@@ -344,6 +389,20 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                 Toast.makeText(activity, R.string.service_not_started, Toast.LENGTH_SHORT).show();
             }
         }
+    }
+
+    private void sendMessages() {
+        handlerSendMessage.postDelayed(new Runnable(){
+            public void run(){
+            if (!messages.isEmpty() && connected) {
+                String message = messages.poll();
+                byte[] send = message.getBytes();
+                mChatService.write(send);
+                mOutStringBuffer.setLength(0);
+            }
+            handlerSendMessage.postDelayed(this, 1000);
+            }
+        }, 1000);
     }
 
     /**
@@ -401,6 +460,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                             Intent intent = new Intent(Constants.NOTIFICATION_LISTENER_GET_ALL_ACTION);
                             mChatService.sendBroadcast(intent);
                             connected = true;
+                            sendMessages();
                             break;
                         case BluetoothChatService.STATE_CONNECTING:
                             setStatus(R.string.title_connecting);
@@ -415,6 +475,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                                 menu.setGroupEnabled(0, true);
                             }
                             connected = false;
+                            handlerSendMessage.removeCallbacksAndMessages(null);
                             break;
                         case BluetoothChatService.STATE_NO_BLUETOOTH:
                             setStatus(R.string.title_no_bluetooth);
@@ -425,6 +486,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                                 menu.setGroupEnabled(0, true); // false
                             }
                             connected = false;
+                            handlerSendMessage.removeCallbacksAndMessages(null);
                     }
                     break;
                 case Constants.MESSAGE_WRITE:
@@ -604,7 +666,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
     }
 
     public String getContactName(Context context, String phoneNumber) {
-        String contactName = null;
+        String contactName = phoneNumber;
         try {
             ContentResolver cr = context.getContentResolver();
             Uri uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(phoneNumber));
@@ -619,10 +681,8 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
             if(!cursor.isClosed()) {
                 cursor.close();
             }
-
-            return contactName;
-        } catch (Exception e) {
-            return phoneNumber;
+        } catch (Exception ignored) {
         }
+        return contactName;
     }
 }

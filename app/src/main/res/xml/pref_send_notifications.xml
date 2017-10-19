@@ -23,4 +23,9 @@
         android:key="read_state_enabled"
         android:title="@string/pref_title_read_state_enabled" />
 
+    <SwitchPreference
+        android:defaultValue="false"
+        android:key="battery_warning_enabled"
+        android:title="@string/pref_title_battery_warning_enabled" />
+
 </PreferenceScreen>
