@@ -271,6 +271,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
             mChatService = myBinder.getService();
             mChatService.setHandler(mHandler);
             mChatService.start();
+            connected = mChatService.getState() == BluetoothChatService.STATE_CONNECTED;
             if (mChatService.getFragmentReceiver() == null) {
                 IntentFilter intentFilter = new IntentFilter();
                 intentFilter.addAction(Constants.NOTIFICATION_LISTENER_POSTED_ACTION);
@@ -368,9 +369,9 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
     private void sendMessage(String message) {
         if (mChatService != null) {
             // Check that we're actually connected before trying anything
-            if (!connected) {
+            /*if (!connected) {
                 return;
-            }
+            }*/
 
             // Check that there's actually something to send
             if (message.length() > 0) {
@@ -459,8 +460,10 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                             mConversationArrayAdapter.clear();
                             Intent intent = new Intent(Constants.NOTIFICATION_LISTENER_GET_ALL_ACTION);
                             mChatService.sendBroadcast(intent);
+                            if (!connected) {
+                                sendMessages();
+                            }
                             connected = true;
-                            sendMessages();
                             break;
                         case BluetoothChatService.STATE_CONNECTING:
                             setStatus(R.string.title_connecting);
