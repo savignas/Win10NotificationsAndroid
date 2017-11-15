@@ -30,6 +30,7 @@ import android.support.v7.app.ActionBar;
 import android.telephony.SmsManager;
 import android.telephony.SmsMessage;
 import android.telephony.TelephonyManager;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -99,11 +100,15 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
 
     private Queue<String> messages = new LinkedList<>();
 
+    private boolean fullBattery;
+    private boolean powerConnected;
+
     private final BroadcastReceiver mNotificationAction = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             final String action = intent.getAction();
 
+            assert action != null;
             switch (action) {
                 case Constants.NOTIFICATION_LISTENER_POSTED_ACTION: {
                     String key = intent.getStringExtra("key");
@@ -130,12 +135,14 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                         Bundle bundle = intent.getExtras();
                         if (bundle != null) {
                             SmsMessage[] messages = Telephony.Sms.Intents.getMessagesFromIntent(intent);
+                            String phoneNumber = null;
+                            StringBuilder message = new StringBuilder();
                             for (SmsMessage currentMessage : messages) {
-                                String phoneNumber = currentMessage.getDisplayOriginatingAddress();
-                                String message = currentMessage.getDisplayMessageBody();
-                                String contactName = getContactName(context, phoneNumber);
-                                sendMessage("1;" + phoneNumber + "_sms" + ";" + contactName + ";" + message);
+                                phoneNumber = currentMessage.getDisplayOriginatingAddress();
+                                message.append(currentMessage.getDisplayMessageBody());
                             }
+                            String contactName = getContactName(context, phoneNumber);
+                            sendMessage("1;" + phoneNumber + "_sms" + ";" + contactName + ";" + message);
                         }
                     }
                     break;
@@ -171,7 +178,8 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                     boolean batteryWarningEnabled = defaultSharedPreferences.getBoolean("battery_warning_enabled", false);
                     if (batteryWarningEnabled) {
                         int status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
-                        if (status == BatteryManager.BATTERY_STATUS_FULL) {
+                        if (status == BatteryManager.BATTERY_STATUS_FULL && !fullBattery && powerConnected) {
+                            fullBattery = true;
                             sendMessage("1;full_battery;Full Battery;full_battery;Full battery;Your device is fully charged!");
                         }
                     }
@@ -181,6 +189,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                     boolean batteryWarningEnabled = defaultSharedPreferences.getBoolean("battery_warning_enabled", false);
                     if (batteryWarningEnabled) {
                         sendMessage("0;low_battery");
+                        powerConnected = true;
                     }
                     break;
                 }
@@ -188,6 +197,8 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                     boolean batteryWarningEnabled = defaultSharedPreferences.getBoolean("battery_warning_enabled", false);
                     if (batteryWarningEnabled) {
                         sendMessage("0;full_battery");
+                        fullBattery = false;
+                        powerConnected = false;
                     }
                     break;
                 }
@@ -369,9 +380,9 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
     private void sendMessage(String message) {
         if (mChatService != null) {
             // Check that we're actually connected before trying anything
-            /*if (!connected) {
+            if (!connected) {
                 return;
-            }*/
+            }
 
             // Check that there's actually something to send
             if (message.length() > 0) {
@@ -400,10 +411,11 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                 byte[] send = message.getBytes();
                 mChatService.write(send);
                 mOutStringBuffer.setLength(0);
+                Log.i("sendMessages", message);
             }
-            handlerSendMessage.postDelayed(this, 1000);
+            handlerSendMessage.postDelayed(this, 500);
             }
-        }, 1000);
+        }, 500);
     }
 
     /**
@@ -554,6 +566,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
 
     private void endCall() throws Exception {
         TelephonyManager telephonyManager = (TelephonyManager) mChatService.getSystemService(Context.TELEPHONY_SERVICE);
+        assert telephonyManager != null;
         Class<?> telephonyClass = Class.forName(telephonyManager.getClass().getName());
         Method GetITelephonyMethod = telephonyClass.getDeclaredMethod("getITelephony");
         GetITelephonyMethod.setAccessible(true);

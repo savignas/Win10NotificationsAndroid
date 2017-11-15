@@ -23,6 +23,8 @@ import android.widget.Toast;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.util.UUID;
 
 import static android.graphics.Color.WHITE;
@@ -50,7 +52,7 @@ public class BluetoothChatService extends Service {
     private final Handler handlerReconnect = new Handler();
     private final Handler handlerNotification = new Handler();
     private BroadcastReceiver fragmentReceiver;
-    private final int reconnectTime = 10000;
+    private final int reconnectTime = 15000;
 
     // Constants that indicate the current connection state
     public static final int STATE_NONE = 0;       // we're doing nothing
@@ -464,9 +466,11 @@ public class BluetoothChatService extends Service {
         void write(byte[] buffer) {
             try {
                 int bufferLength = buffer.length;
-                byte[] newBuffer = new byte[bufferLength + 1];
-                newBuffer[0] = (byte) bufferLength;
-                System.arraycopy(buffer, 0, newBuffer, 1, bufferLength);
+                byte[] bufferLengthBytes = ByteBuffer.allocate(4).putInt(bufferLength).array();
+                int bufferLengthBytesLength = bufferLengthBytes.length;
+                byte[] newBuffer = new byte[bufferLengthBytesLength + bufferLength];
+                System.arraycopy(bufferLengthBytes, 0, newBuffer, 0, bufferLengthBytesLength);
+                System.arraycopy(buffer, 0, newBuffer, bufferLengthBytesLength, bufferLength);
                 mmOutStream.write(newBuffer);
 
                 if (mHandler != null) {
@@ -574,6 +578,7 @@ public class BluetoothChatService extends Service {
         builder.setLights(WHITE, 1000, 1000);
         builder.setAutoCancel(true);
         builder.setPriority(priority);
+        builder.setStyle(new NotificationCompat.BigTextStyle().bigText(text));
         notificationManager.notify(notificationId, builder.build());
     }
 
