@@ -8,23 +8,38 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 import android.content.BroadcastReceiver;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
+import android.database.Cursor;
+import android.net.Uri;
+import android.os.BatteryManager;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
+import android.preference.PreferenceManager;
+import android.provider.ContactsContract;
+import android.provider.Telephony;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.NotificationCompat;
+import android.telephony.SmsManager;
+import android.telephony.SmsMessage;
+import android.telephony.TelephonyManager;
+import android.util.Log;
 import android.widget.Toast;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.math.BigInteger;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.util.LinkedList;
+import java.util.Objects;
+import java.util.Queue;
 import java.util.UUID;
 
 import static android.graphics.Color.WHITE;
@@ -49,10 +64,20 @@ public class BluetoothChatService extends Service {
     private boolean wasConnected = false;
     private boolean connecting = false;
     private boolean notConnected = true;
+    private boolean connected = false;
     private final Handler handlerReconnect = new Handler();
     private final Handler handlerNotification = new Handler();
-    private BroadcastReceiver fragmentReceiver;
     private final int reconnectTime = 15000;
+
+    private SharedPreferences defaultSharedPreferences;
+    private String callerPhoneNumber;
+
+    private boolean fullBattery;
+    private boolean powerConnected;
+
+    private Queue<String> messages = new LinkedList<>();
+
+    private final Handler handlerSendMessage = new Handler();
 
     // Constants that indicate the current connection state
     public static final int STATE_NONE = 0;       // we're doing nothing
@@ -66,6 +91,7 @@ public class BluetoothChatService extends Service {
         public void onReceive(Context context, Intent intent) {
             final String action = intent.getAction();
 
+            assert action != null;
             if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
                 final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
                 switch (state) {
@@ -91,6 +117,109 @@ public class BluetoothChatService extends Service {
         }
     };
 
+    private final BroadcastReceiver mNotificationAction = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            final String action = intent.getAction();
+
+            assert action != null;
+            switch (action) {
+                case Constants.NOTIFICATION_LISTENER_POSTED_ACTION: {
+                    String key = intent.getStringExtra("key");
+                    CharSequence appName = intent.getCharSequenceExtra("appName");
+                    String packageName = intent.getStringExtra("packageName");
+                    CharSequence title = intent.getCharSequenceExtra("title");
+                    CharSequence text = intent.getCharSequenceExtra("text");
+                    sendMessage("1;" + key + ";" + appName + ";" + packageName + ";" + title + ";" + text);
+                    break;
+                }
+                case Constants.NOTIFICATION_LISTENER_REMOVED_ACTION: {
+                    String key = intent.getStringExtra("key");
+                    sendMessage("0;" + key);
+                    break;
+                }
+                case Constants.NOTIFICATION_DELETED_ACTION: {
+                    int notificationId = intent.getIntExtra("notificationId", 0);
+                    sendMessage("0;" + Integer.toString(notificationId));
+                    break;
+                }
+                case Telephony.Sms.Intents.SMS_RECEIVED_ACTION: {
+                    boolean readSmsEnabled = defaultSharedPreferences.getBoolean("read_sms_enabled", false);
+                    if (readSmsEnabled) {
+                        Bundle bundle = intent.getExtras();
+                        if (bundle != null) {
+                            SmsMessage[] messages = Telephony.Sms.Intents.getMessagesFromIntent(intent);
+                            String phoneNumber = null;
+                            StringBuilder message = new StringBuilder();
+                            for (SmsMessage currentMessage : messages) {
+                                phoneNumber = currentMessage.getDisplayOriginatingAddress();
+                                message.append(currentMessage.getDisplayMessageBody());
+                            }
+                            String contactName = getContactName(context, phoneNumber);
+                            sendMessage("1;" + phoneNumber + "_sms" + ";" + contactName + ";" + message);
+                        }
+                    }
+                    break;
+                }
+                case "android.intent.action.PHONE_STATE": {
+                    boolean readStateEnabled = defaultSharedPreferences.getBoolean("read_state_enabled", false);
+                    if (readStateEnabled) {
+                        String state = intent.getStringExtra(TelephonyManager.EXTRA_STATE);
+                        if (state != null && state.equals(TelephonyManager.EXTRA_STATE_RINGING)) {
+                            callerPhoneNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER);
+                            String contactName = getContactName(context, callerPhoneNumber);
+                            sendMessage("1;" + callerPhoneNumber + "_call" + ";" + contactName);
+                        } else if (state != null && state.equals(TelephonyManager.EXTRA_STATE_IDLE)) {
+                            if (callerPhoneNumber != null) {
+                                sendMessage("0;" + callerPhoneNumber + "_call");
+                                callerPhoneNumber = null;
+                            }
+                        } else if (state != null && state.equals(TelephonyManager.EXTRA_STATE_OFFHOOK)) {
+                            sendMessage("0;" + callerPhoneNumber + "_call");
+                            callerPhoneNumber = null;
+                        }
+                    }
+                    break;
+                }
+                case Intent.ACTION_BATTERY_LOW: {
+                    boolean batteryWarningEnabled = defaultSharedPreferences.getBoolean("battery_warning_enabled", false);
+                    if (batteryWarningEnabled) {
+                        sendMessage("1;low_battery;Low Battery;low_battery;Low battery;Your device is on low battery!");
+                    }
+                    break;
+                }
+                case Intent.ACTION_BATTERY_CHANGED: {
+                    boolean batteryWarningEnabled = defaultSharedPreferences.getBoolean("battery_warning_enabled", false);
+                    if (batteryWarningEnabled) {
+                        int status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+                        if (status == BatteryManager.BATTERY_STATUS_FULL && !fullBattery && powerConnected) {
+                            fullBattery = true;
+                            sendMessage("1;full_battery;Full Battery;full_battery;Full battery;Your device is fully charged!");
+                        }
+                    }
+                    break;
+                }
+                case Intent.ACTION_POWER_CONNECTED: {
+                    boolean batteryWarningEnabled = defaultSharedPreferences.getBoolean("battery_warning_enabled", false);
+                    if (batteryWarningEnabled) {
+                        sendMessage("0;low_battery");
+                        powerConnected = true;
+                    }
+                    break;
+                }
+                case Intent.ACTION_POWER_DISCONNECTED: {
+                    boolean batteryWarningEnabled = defaultSharedPreferences.getBoolean("battery_warning_enabled", false);
+                    if (batteryWarningEnabled) {
+                        sendMessage("0;full_battery");
+                        fullBattery = false;
+                        powerConnected = false;
+                    }
+                    break;
+                }
+            }
+        }
+    };
+
     /**
      * Constructor. Prepares a new BluetoothChat session.
      */
@@ -100,13 +229,13 @@ public class BluetoothChatService extends Service {
         mNewState = mState;
     }
 
-    public BroadcastReceiver getFragmentReceiver() {
+    /*public BroadcastReceiver getFragmentReceiver() {
         return fragmentReceiver;
     }
 
     public void setFragmentReceiver(BroadcastReceiver receiver) {
         this.fragmentReceiver = receiver;
-    }
+    }*/
 
     private synchronized void updateUserInterfaceTitle() {
         mNewState = mState;
@@ -118,7 +247,13 @@ public class BluetoothChatService extends Service {
         switch (mNewState) {
             case STATE_CONNECTED:
                 setForegroundNotification(getString(R.string.title_connected_to, mConnectedDeviceName));
+                if (!connected) {
+                   sendMessages();
+                    Intent intent = new Intent(Constants.NOTIFICATION_LISTENER_GET_ALL_ACTION);
+                    sendBroadcast(intent);
+                }
                 connecting = false;
+                connected = true;
                 break;
             case STATE_CONNECTING:
                 if (!connecting && wasConnected)
@@ -139,10 +274,14 @@ public class BluetoothChatService extends Service {
                     setForegroundNotification(getString(R.string.title_connecting));
                     connecting = true;
                 }
+                handlerSendMessage.removeCallbacksAndMessages(null);
+                connected = false;
                 break;
             case STATE_NO_BLUETOOTH:
                 setForegroundNotification(getString(R.string.title_no_bluetooth));
                 connecting = false;
+                handlerSendMessage.removeCallbacksAndMessages(null);
+                connected = false;
         }
     }
 
@@ -153,12 +292,12 @@ public class BluetoothChatService extends Service {
         return mState;
     }
 
-    public synchronized void setWasConnected(boolean wasConnected) {
-        this.wasConnected = wasConnected;
+    public synchronized void setWasConnected() {
+        this.wasConnected = false;
     }
 
-    public synchronized void setNotConnected(boolean notConnected) {
-        this.notConnected = notConnected;
+    public synchronized void setNotConnected() {
+        this.notConnected = true;
     }
 
     /**
@@ -445,7 +584,41 @@ public class BluetoothChatService extends Service {
                 try {
                     // Read from the InputStream
                     bytes = mmInStream.read(buffer);
-
+                    String readMessage = new String(buffer, 0, bytes);
+                    String[] messageParts = readMessage.split(";", -1);
+                    if (Objects.equals(messageParts[0], "1")) {
+                        if (!Objects.equals(messageParts[4], "")) {
+                            showNotification(messageParts[3], Integer.parseInt(messageParts[1]), messageParts[4], messageParts[2], Notification.PRIORITY_DEFAULT);
+                        }
+                        else {
+                            showNotification(messageParts[2], Integer.parseInt(messageParts[1]), messageParts[3], messageParts[2], Notification.PRIORITY_DEFAULT);
+                        }
+                    }
+                    else if (Objects.equals(messageParts[0], "0")) {
+                        try {
+                            cancelNotification(Integer.parseInt(messageParts[1]));
+                        }
+                        catch (Exception ex) {
+                            if (messageParts[1].startsWith("+")) {
+                                SmsManager smsManager = SmsManager.getDefault();
+                                String phoneNumber = messageParts[1].substring(0, 12);
+                                if (messageParts[1].endsWith("sms")) {
+                                    try {
+                                        smsManager.sendTextMessage(phoneNumber, null, messageParts[2], null, null);
+                                    } catch (Exception ignored) {}
+                                } else if (messageParts[1].endsWith("call")) {
+                                    try {
+                                        endCall();
+                                        smsManager.sendTextMessage(phoneNumber, null, messageParts[2], null, null);
+                                    } catch (Exception ignored) {}
+                                }
+                            } else {
+                                Intent intent = new Intent(Constants.NOTIFICATION_LISTENER_CANCELED_ACTION);
+                                intent.putExtra("key", messageParts[1]);
+                                sendBroadcast(intent);
+                            }
+                        }
+                    }
                     if (mHandler != null) {
                         // Send the obtained bytes to the UI Activity
                         mHandler.obtainMessage(Constants.MESSAGE_READ, bytes, -1, buffer)
@@ -456,6 +629,18 @@ public class BluetoothChatService extends Service {
                     break;
                 }
             }
+        }
+
+        private void endCall() throws Exception {
+            TelephonyManager telephonyManager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
+            assert telephonyManager != null;
+            Class<?> telephonyClass = Class.forName(telephonyManager.getClass().getName());
+            Method GetITelephonyMethod = telephonyClass.getDeclaredMethod("getITelephony");
+            GetITelephonyMethod.setAccessible(true);
+            Object telephonyInterface = GetITelephonyMethod.invoke(telephonyManager);
+            Class<?> telephonyInterfaceClass = Class.forName(telephonyInterface.getClass().getName());
+            Method endCallMethod = telephonyInterfaceClass.getDeclaredMethod("endCall");
+            endCallMethod.invoke(telephonyInterface);
         }
 
         /**
@@ -517,9 +702,22 @@ public class BluetoothChatService extends Service {
 
         setForegroundNotification(getString(R.string.title_not_connected));
 
-        IntentFilter filter = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
+        IntentFilter intentFilter = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
+        registerReceiver(mBroadcastReceiver, intentFilter);
 
-        registerReceiver(mBroadcastReceiver, filter);
+        intentFilter = new IntentFilter();
+        intentFilter.addAction(Constants.NOTIFICATION_LISTENER_POSTED_ACTION);
+        intentFilter.addAction(Constants.NOTIFICATION_LISTENER_REMOVED_ACTION);
+        intentFilter.addAction(Constants.NOTIFICATION_DELETED_ACTION);
+        intentFilter.addAction(Telephony.Sms.Intents.SMS_RECEIVED_ACTION);
+        intentFilter.addAction("android.intent.action.PHONE_STATE");
+        intentFilter.addAction(Intent.ACTION_BATTERY_LOW);
+        intentFilter.addAction(Intent.ACTION_BATTERY_CHANGED);
+        intentFilter.addAction(Intent.ACTION_POWER_CONNECTED);
+        intentFilter.addAction(Intent.ACTION_POWER_DISCONNECTED);
+        registerReceiver(mNotificationAction, intentFilter);
+
+        defaultSharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
     }
 
     @Override
@@ -545,6 +743,7 @@ public class BluetoothChatService extends Service {
         }
 
         unregisterReceiver(mBroadcastReceiver);
+        unregisterReceiver(mNotificationAction);
     }
 
     class MyBinder extends Binder {
@@ -568,6 +767,7 @@ public class BluetoothChatService extends Service {
             intent.putExtra("notificationId", notificationId);
             PendingIntent pendingIntent = PendingIntent.getBroadcast(this, notificationId, intent, 0);
             builder.setDeleteIntent(pendingIntent);
+            builder.setStyle(new NotificationCompat.BigTextStyle().bigText(text));
         }
 
         builder.setSmallIcon(R.drawable.ic_notification);
@@ -578,7 +778,6 @@ public class BluetoothChatService extends Service {
         builder.setLights(WHITE, 1000, 1000);
         builder.setAutoCancel(true);
         builder.setPriority(priority);
-        builder.setStyle(new NotificationCompat.BigTextStyle().bigText(text));
         notificationManager.notify(notificationId, builder.build());
     }
 
@@ -600,5 +799,57 @@ public class BluetoothChatService extends Service {
      */
     public void cancelNotification(int notificationId) {
         notificationManager.cancel(notificationId);
+    }
+
+    /**
+     * Sends a message.
+     *
+     * @param message A string of text to send.
+     */
+    private void sendMessage(String message) {
+        // Check that we're actually connected before trying anything
+        if (!connected) {
+            return;
+        }
+
+        // Check that there's actually something to send
+        if (message.length() > 0) {
+            messages.offer(message);
+        }
+    }
+
+    private void sendMessages() {
+        handlerSendMessage.postDelayed(new Runnable(){
+            public void run(){
+                if (!messages.isEmpty() && connected) {
+                    String message = messages.poll();
+                    byte[] send = message.getBytes();
+                    write(send);
+                    Log.i("sendMessages", message);
+                }
+                handlerSendMessage.postDelayed(this, 500);
+            }
+        }, 500);
+    }
+
+    private String getContactName(Context context, String phoneNumber) {
+        String contactName = phoneNumber;
+        try {
+            ContentResolver cr = context.getContentResolver();
+            Uri uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(phoneNumber));
+            Cursor cursor = cr.query(uri, new String[]{ContactsContract.PhoneLookup.DISPLAY_NAME}, null, null, null);
+            if (cursor == null) {
+                return null;
+            }
+            if(cursor.moveToFirst()) {
+                contactName = cursor.getString(cursor.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME));
+            }
+
+            if(!cursor.isClosed()) {
+                cursor.close();
+            }
+        } catch (Exception ignored) {
+        }
+        return contactName;
     }
 }
