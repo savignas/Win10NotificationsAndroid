@@ -176,8 +176,6 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                 View view = getView();
                 if (null != view) {
                     if (mChatService != null) {
-                        /*BroadcastReceiver receiver = mChatService.getFragmentReceiver();
-                        mChatService.unregisterReceiver(receiver);*/
                         Intent stopIntent = new Intent(getActivity(), BluetoothChatService.class);
                         stopIntent.setAction(Constants.STOP_FOREGROUND_ACTION);
                         getActivity().startService(stopIntent);
@@ -268,11 +266,13 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                 case Constants.MESSAGE_STATE_CHANGE:
                     switch (msg.arg1) {
                         case BluetoothChatService.STATE_CONNECTED:
-                            setStatus(mChatService.getString(R.string.title_connected_to, mConnectedDeviceName));
-                            if (menu != null) {
-                                MenuItem item = menu.findItem(R.id.secure_connect);
-                                item.setTitle(mChatService.getString(R.string.secure_disconnect_from, mConnectedDeviceName));
-                                menu.setGroupEnabled(0, true);
+                            if (activity != null) {
+                                setStatus(getString(R.string.title_connected_to, mConnectedDeviceName));
+                                if (menu != null) {
+                                    MenuItem item = menu.findItem(R.id.secure_connect);
+                                    item.setTitle(getString(R.string.secure_disconnect_from, mConnectedDeviceName));
+                                    menu.setGroupEnabled(0, true);
+                                }
                             }
                             mConversationArrayAdapter.clear();
                             connected = true;
@@ -284,19 +284,19 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
                         case BluetoothChatService.STATE_NONE:
                             setStatus(R.string.title_not_connected);
                             String name = sharedPreferences.getString("DEVICE_NAME", "");
-                            if (menu != null && mChatService != null) {
+                            if (activity != null && menu != null) {
                                 MenuItem item = menu.findItem(R.id.secure_connect);
-                                item.setTitle(mChatService.getString(R.string.secure_connect_to, name));
+                                item.setTitle(getString(R.string.secure_connect_to, name));
                                 menu.setGroupEnabled(0, true);
                             }
                             connected = false;
                             break;
                         case BluetoothChatService.STATE_NO_BLUETOOTH:
                             setStatus(R.string.title_no_bluetooth);
-                            if (menu != null) {
+                            if (activity != null && menu != null) {
                                 name = sharedPreferences.getString("DEVICE_NAME", "");
                                 MenuItem item = menu.findItem(R.id.secure_connect);
-                                item.setTitle(mChatService.getString(R.string.secure_connect_to, name));
+                                item.setTitle(getString(R.string.secure_connect_to, name));
                                 menu.setGroupEnabled(0, true); // false
                             }
                             connected = false;

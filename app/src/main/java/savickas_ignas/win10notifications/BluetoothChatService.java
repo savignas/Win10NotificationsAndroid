@@ -282,6 +282,7 @@ public class BluetoothChatService extends Service {
                 connecting = false;
                 handlerSendMessage.removeCallbacksAndMessages(null);
                 connected = false;
+                notConnected = true;
         }
     }
 
