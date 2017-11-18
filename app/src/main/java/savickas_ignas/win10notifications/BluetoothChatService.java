@@ -73,7 +73,7 @@ public class BluetoothChatService extends Service {
     private String callerPhoneNumber;
 
     private boolean fullBattery;
-    private boolean powerConnected;
+    private boolean powerConnected = true;
 
     private Queue<String> messages = new LinkedList<>();
 
@@ -192,7 +192,7 @@ public class BluetoothChatService extends Service {
                     boolean batteryWarningEnabled = defaultSharedPreferences.getBoolean("battery_warning_enabled", false);
                     if (batteryWarningEnabled) {
                         int status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
-                        if (status == BatteryManager.BATTERY_STATUS_FULL && !fullBattery && powerConnected) {
+                        if (status == BatteryManager.BATTERY_STATUS_FULL && !fullBattery && powerConnected && connected) {
                             fullBattery = true;
                             sendMessage("1;full_battery;Full Battery;full_battery;Full battery;Your device is fully charged!");
                         }
@@ -276,6 +276,8 @@ public class BluetoothChatService extends Service {
                 }
                 handlerSendMessage.removeCallbacksAndMessages(null);
                 connected = false;
+                fullBattery = false;
+                powerConnected = true;
                 break;
             case STATE_NO_BLUETOOTH:
                 setForegroundNotification(getString(R.string.title_no_bluetooth));
