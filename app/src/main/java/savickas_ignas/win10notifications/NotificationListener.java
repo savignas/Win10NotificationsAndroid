@@ -1,7 +1,6 @@
 package savickas_ignas.win10notifications;
 
 import android.app.Notification;
-import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -30,6 +29,7 @@ public class NotificationListener extends NotificationListenerService {
         public void onReceive(Context context, Intent intent) {
             final String action = intent.getAction();
 
+            assert action != null;
             if (action.equals(Constants.NOTIFICATION_LISTENER_CANCELED_ACTION)) {
                 String key = intent.getStringExtra("key");
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -99,7 +99,8 @@ public class NotificationListener extends NotificationListenerService {
         for (String app: apps) {
             String appPackageName = statusBarNotification.getPackageName();
             if (app.equals(appPackageName)) {
-                CharSequence text = statusBarNotification.getNotification().extras.getCharSequence("android.text");
+                Notification notification = statusBarNotification.getNotification();
+                CharSequence text = notification.extras.getCharSequence("android.text");
                 if (text == null) {
                     action = Constants.NOTIFICATION_LISTENER_REMOVED_ACTION;
                 }
@@ -123,13 +124,10 @@ public class NotificationListener extends NotificationListenerService {
                     } catch (PackageManager.NameNotFoundException ignored) {}
                     intent.putExtra("appName", appName);
                     intent.putExtra("packageName", appPackageName);
-                    intent.putExtra("title", statusBarNotification.getNotification().extras.getCharSequence("android.title"));
+                    intent.putExtra("title", notification.extras.getCharSequence("android.title"));
                     intent.putExtra("text", text);
-                    Notification.Action actions[] = statusBarNotification.getNotification().actions;
-                    if (actions != null) {
-                        for (Notification.Action notificationAction : actions) {
-                            PendingIntent pendingIntent = notificationAction.actionIntent;
-                        }
+                    if (notification.contentIntent != null) {
+                        intent.putExtra("contentIntent", notification.contentIntent);
                     }
                 }
                 sendBroadcast(intent);

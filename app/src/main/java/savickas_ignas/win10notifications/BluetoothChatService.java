@@ -37,7 +37,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.UUID;
@@ -76,6 +78,7 @@ public class BluetoothChatService extends Service {
     private boolean powerConnected = true;
 
     private Queue<String> messages = new LinkedList<>();
+    private Map<String, PendingIntent> notificationContentIntents = new HashMap<>();
 
     private final Handler handlerSendMessage = new Handler();
 
@@ -130,12 +133,19 @@ public class BluetoothChatService extends Service {
                     String packageName = intent.getStringExtra("packageName");
                     CharSequence title = intent.getCharSequenceExtra("title");
                     CharSequence text = intent.getCharSequenceExtra("text");
-                    sendMessage("1;" + key + ";" + appName + ";" + packageName + ";" + title + ";" + text);
+                    PendingIntent pendingIntent = intent.getParcelableExtra("contentIntent");
+                    String contentIntent = "";
+                    if (pendingIntent != null) {
+                        notificationContentIntents.put(key, pendingIntent);
+                        contentIntent = "intent";
+                    }
+                    sendMessage("1;" + key + ";" + appName + ";" + packageName + ";" + title + ";" + text + ";" + contentIntent);
                     break;
                 }
                 case Constants.NOTIFICATION_LISTENER_REMOVED_ACTION: {
                     String key = intent.getStringExtra("key");
                     sendMessage("0;" + key);
+                    notificationContentIntents.remove(key);
                     break;
                 }
                 case Constants.NOTIFICATION_DELETED_ACTION: {
@@ -596,8 +606,7 @@ public class BluetoothChatService extends Service {
                         else {
                             showNotification(messageParts[2], Integer.parseInt(messageParts[1]), messageParts[3], messageParts[2], Notification.PRIORITY_DEFAULT);
                         }
-                    }
-                    else if (Objects.equals(messageParts[0], "0")) {
+                    } else if (Objects.equals(messageParts[0], "0")) {
                         try {
                             cancelNotification(Integer.parseInt(messageParts[1]));
                         }
@@ -616,12 +625,23 @@ public class BluetoothChatService extends Service {
                                     } catch (Exception ignored) {}
                                 }
                             } else {
+                                notificationContentIntents.remove(messageParts[1]);
                                 Intent intent = new Intent(Constants.NOTIFICATION_LISTENER_CANCELED_ACTION);
                                 intent.putExtra("key", messageParts[1]);
                                 sendBroadcast(intent);
                             }
                         }
+                    } else if (Objects.equals(messageParts[0], "2")) {
+                        PendingIntent pendingIntent = notificationContentIntents.get(messageParts[1]);
+                        try {
+                            pendingIntent.send();
+                        } catch (PendingIntent.CanceledException ignored) {}
+                        notificationContentIntents.remove(messageParts[1]);
+                        Intent intent = new Intent(Constants.NOTIFICATION_LISTENER_CANCELED_ACTION);
+                        intent.putExtra("key", messageParts[1]);
+                        sendBroadcast(intent);
                     }
+
                     if (mHandler != null) {
                         // Send the obtained bytes to the UI Activity
                         mHandler.obtainMessage(Constants.MESSAGE_READ, bytes, -1, buffer)

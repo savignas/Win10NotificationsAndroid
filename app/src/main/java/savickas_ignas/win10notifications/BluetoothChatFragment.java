@@ -110,8 +110,8 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
             getActivity().unbindService(BluetoothChatFragment.this);
             serviceBound = false;
         }
-        if (mChatService != null)
-        {
+        if (mChatService != null) {
+            mChatService.setHandler(null);
             mChatService = null;
         }
     }
@@ -157,6 +157,7 @@ public class BluetoothChatFragment extends Fragment implements ServiceConnection
     @Override
     public void onServiceDisconnected(ComponentName name) {
         if (mChatService != null) {
+            mChatService.setHandler(null);
             mChatService = null;
         }
     }
