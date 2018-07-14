@@ -135,23 +135,22 @@ public class BluetoothChatService extends Service {
                     CharSequence title = intent.getCharSequenceExtra("title");
                     CharSequence text = intent.getCharSequenceExtra("text");
                     PendingIntent pendingIntent = intent.getParcelableExtra("contentIntent");
-                    String contentIntent = "";
                     if (pendingIntent != null) {
                         notificationContentIntents.put(key, pendingIntent);
-                        contentIntent = "intent";
+                        sendMessage(key, title, text, appName, packageName, "intent");
                     }
-                    sendMessage("1;" + key + ";" + appName + ";" + packageName + ";" + title + ";" + text + ";" + contentIntent);
+                    sendMessage(key, title, text, appName, packageName);
                     break;
                 }
                 case Constants.NOTIFICATION_LISTENER_REMOVED_ACTION: {
                     String key = intent.getStringExtra("key");
-                    sendMessage("0;" + key);
+                    sendMessage(key);
                     notificationContentIntents.remove(key);
                     break;
                 }
                 case Constants.NOTIFICATION_DELETED_ACTION: {
                     int notificationId = intent.getIntExtra("notificationId", 0);
-                    sendMessage("0;" + Integer.toString(notificationId));
+                    sendMessage(Integer.toString(notificationId));
                     break;
                 }
                 case Telephony.Sms.Intents.SMS_RECEIVED_ACTION: {
@@ -167,7 +166,7 @@ public class BluetoothChatService extends Service {
                                 message.append(currentMessage.getDisplayMessageBody());
                             }
                             String contactName = getContactName(context, phoneNumber);
-                            sendMessage("1;" + phoneNumber + "_sms" + ";" + contactName + ";" + message);
+                            sendMessage(phoneNumber + "_sms", contactName, message.toString());
                         }
                     }
                     break;
@@ -179,14 +178,14 @@ public class BluetoothChatService extends Service {
                         if (state != null && state.equals(TelephonyManager.EXTRA_STATE_RINGING)) {
                             callerPhoneNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER);
                             String contactName = getContactName(context, callerPhoneNumber);
-                            sendMessage("1;" + callerPhoneNumber + "_call" + ";" + contactName);
+                            sendMessage(callerPhoneNumber + "_call", contactName);
                         } else if (state != null && state.equals(TelephonyManager.EXTRA_STATE_IDLE)) {
                             if (callerPhoneNumber != null) {
-                                sendMessage("0;" + callerPhoneNumber + "_call");
+                                sendMessage(callerPhoneNumber + "_call");
                                 callerPhoneNumber = null;
                             }
                         } else if (state != null && state.equals(TelephonyManager.EXTRA_STATE_OFFHOOK)) {
-                            sendMessage("0;" + callerPhoneNumber + "_call");
+                            sendMessage(callerPhoneNumber + "_call");
                             callerPhoneNumber = null;
                         }
                     }
@@ -195,7 +194,7 @@ public class BluetoothChatService extends Service {
                 case Intent.ACTION_BATTERY_LOW: {
                     boolean batteryWarningEnabled = defaultSharedPreferences.getBoolean("battery_warning_enabled", false);
                     if (batteryWarningEnabled) {
-                        sendMessage("1;low_battery;Low Battery;low_battery;Low battery;Your device is on low battery!;");
+                        sendMessage("low_battery", "Low battery","Your device is on low battery!", "Low Battery", "low_battery");
                     }
                     break;
                 }
@@ -205,7 +204,7 @@ public class BluetoothChatService extends Service {
                         int status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
                         if (status == BatteryManager.BATTERY_STATUS_FULL && !fullBattery && powerConnected && connected) {
                             fullBattery = true;
-                            sendMessage("1;full_battery;Full Battery;full_battery;Full battery;Your device is fully charged!;");
+                            sendMessage("full_battery", "Full battery", "Your device is fully charged!", "Full Battery", "full_battery");
                         }
                     }
                     break;
@@ -213,7 +212,7 @@ public class BluetoothChatService extends Service {
                 case Intent.ACTION_POWER_CONNECTED: {
                     boolean batteryWarningEnabled = defaultSharedPreferences.getBoolean("battery_warning_enabled", false);
                     if (batteryWarningEnabled) {
-                        sendMessage("0;low_battery");
+                        sendMessage("low_battery");
                         powerConnected = true;
                     }
                     break;
@@ -221,7 +220,7 @@ public class BluetoothChatService extends Service {
                 case Intent.ACTION_POWER_DISCONNECTED: {
                     boolean batteryWarningEnabled = defaultSharedPreferences.getBoolean("battery_warning_enabled", false);
                     if (batteryWarningEnabled) {
-                        sendMessage("0;full_battery");
+                        sendMessage("full_battery");
                         fullBattery = false;
                         powerConnected = false;
                     }
@@ -602,46 +601,64 @@ public class BluetoothChatService extends Service {
                     bytes = mmInStream.read(buffer);
                     String readMessage = new String(buffer, 0, bytes);
                     String[] messageParts = readMessage.split(";", -1);
-                    if (Objects.equals(messageParts[0], "1")) {
-                        if (!Objects.equals(messageParts[4], "")) {
-                            showWindowsNotification(messageParts[3], Integer.parseInt(messageParts[1]), messageParts[4], messageParts[2]);
+                    StringBuilder notificationText = new StringBuilder();
+                    for (int i=5; i<messageParts.length; i++) {
+                        notificationText.append(messageParts[i]);
+                        if (i + 1 < messageParts.length) {
+                            notificationText.append(';');
+                        }
+                    }
+                    String[] textParts = new String[5];
+                    int location = 0;
+                    for (int i=0; i<textParts.length; i++) {
+                        textParts[i] = notificationText.substring(location, location + Integer.parseInt(messageParts[i]));
+                        location += Integer.parseInt(messageParts[i]);
+                    }
+                    Type action = Type.valueOf(Integer.parseInt(textParts[0]));
+                    String id = textParts[1];
+                    String  titleText = textParts[2];
+                    String bodyText = textParts[3];
+                    String appName = textParts[4];
+                    if (action == Type.Add) {
+                        if (!Objects.equals(bodyText, "")) {
+                            showWindowsNotification(titleText, Integer.parseInt(id), bodyText, appName);
                         }
                         else {
-                            showWindowsNotification(messageParts[2], Integer.parseInt(messageParts[1]), messageParts[3], messageParts[2]);
+                            showWindowsNotification(appName, Integer.parseInt(id), titleText, appName);
                         }
-                    } else if (Objects.equals(messageParts[0], "0")) {
+                    } else if (action == Type.Remove) {
                         try {
-                            cancelNotification(Integer.parseInt(messageParts[1]));
+                            cancelNotification(Integer.parseInt(id));
                         }
                         catch (Exception ex) {
-                            if (messageParts[1].startsWith("+")) {
+                            if (id.startsWith("+")) {
                                 SmsManager smsManager = SmsManager.getDefault();
-                                String phoneNumber = messageParts[1].substring(0, 12);
-                                if (messageParts[1].endsWith("sms")) {
+                                String phoneNumber = id.substring(0, 12);
+                                if (id.endsWith("sms")) {
                                     try {
-                                        smsManager.sendTextMessage(phoneNumber, null, messageParts[2], null, null);
+                                        smsManager.sendTextMessage(phoneNumber, null, titleText, null, null);
                                     } catch (Exception ignored) {}
-                                } else if (messageParts[1].endsWith("call")) {
+                                } else if (id.endsWith("call")) {
                                     try {
                                         endCall();
-                                        smsManager.sendTextMessage(phoneNumber, null, messageParts[2], null, null);
+                                        smsManager.sendTextMessage(phoneNumber, null, titleText, null, null);
                                     } catch (Exception ignored) {}
                                 }
                             } else {
-                                notificationContentIntents.remove(messageParts[1]);
+                                notificationContentIntents.remove(id);
                                 Intent intent = new Intent(Constants.NOTIFICATION_LISTENER_CANCELED_ACTION);
-                                intent.putExtra("key", messageParts[1]);
+                                intent.putExtra("key", id);
                                 sendBroadcast(intent);
                             }
                         }
-                    } else if (Objects.equals(messageParts[0], "2")) {
-                        PendingIntent pendingIntent = notificationContentIntents.get(messageParts[1]);
+                    } else if (action == Type.Open) {
+                        PendingIntent pendingIntent = notificationContentIntents.get(id);
                         try {
                             pendingIntent.send();
                         } catch (PendingIntent.CanceledException ignored) {}
-                        notificationContentIntents.remove(messageParts[1]);
+                        notificationContentIntents.remove(id);
                         Intent intent = new Intent(Constants.NOTIFICATION_LISTENER_CANCELED_ACTION);
-                        intent.putExtra("key", messageParts[1]);
+                        intent.putExtra("key", id);
                         sendBroadcast(intent);
                     }
 
@@ -732,8 +749,7 @@ public class BluetoothChatService extends Service {
 
         Notification.Builder builder;
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            builder = new Notification.Builder(this, Constants.FOREGROUND_SERVICE_CHANNEL_ID)
-                    .setColor(WHITE);
+            builder = new Notification.Builder(this, Constants.FOREGROUND_SERVICE_CHANNEL_ID);
         } else {
             builder = new Notification.Builder(this)
                     .setPriority(Notification.PRIORITY_MIN);
@@ -819,10 +835,10 @@ public class BluetoothChatService extends Service {
      * Send a sample notification using the NotificationCompat API.
      */
     public synchronized void showWindowsNotification(String title, int notificationId, String text, String appName) {
-        Notification.Builder builder = null;
+        Notification.Builder builder;
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             builder = new Notification.Builder(this, Constants.WINDOWS_NOTIFICATIONS_CHANNEL_ID)
-                    .setColor(WHITE);
+                    .setColor(getColor(R.color.colorPrimaryDark));
         } else {
             builder = new Notification.Builder(this)
                     .setPriority(Notification.PRIORITY_DEFAULT);
@@ -878,12 +894,42 @@ public class BluetoothChatService extends Service {
         notificationManager.cancel(notificationId);
     }
 
+    private synchronized String generateMessage(Type type, String key, String title, String text, String appName, String packageName, String contentIntent) {
+        return Integer.toString(type.getValue()).length() + ";" + key.length() + ";" + title.length() + ";" + text.length() + ";" + appName.length() + ";" + packageName.length() + ";" + contentIntent.length() + ";" +
+                Integer.toString(type.getValue()) + key + appName + packageName + title + text + contentIntent;
+    }
+
+    private synchronized void sendMessage(String key, CharSequence title, CharSequence text, CharSequence appName, String packageName, String contentIntent) {
+        String message = generateMessage(Type.Add, key, title.toString(), text.toString(), appName.toString(), packageName, contentIntent);
+        addMessage(message);
+    }
+
+    private synchronized void sendMessage(String key, CharSequence title, CharSequence text, CharSequence appName, String packageName) {
+        String message = generateMessage(Type.Add, key, title.toString(), text.toString(), appName.toString(), packageName, "");
+        addMessage(message);
+    }
+
+    private synchronized void sendMessage(String key, String contactName, String textMessage) {
+        String message = generateMessage(Type.Add, key, contactName, textMessage, "", "", "");
+        addMessage(message);
+    }
+
+    private synchronized void sendMessage(String key, String contactName) {
+        String message = generateMessage(Type.Add, key, contactName, "", "", "", "");
+        addMessage(message);
+    }
+
+    private synchronized void sendMessage(String key) {
+        String message = generateMessage(Type.Remove, key, "", "", "", "", "");
+        addMessage(message);
+    }
+
     /**
      * Sends a message.
      *
      * @param message A string of text to send.
      */
-    private synchronized void sendMessage(String message) {
+    private synchronized void addMessage(String message) {
         // Check that we're actually connected before trying anything
         if (!connected) {
             return;

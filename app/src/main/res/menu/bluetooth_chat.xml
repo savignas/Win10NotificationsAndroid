@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
         android:id="@+id/secure_connect"
-        android:icon="@drawable/ic_action_device_access_bluetooth_searching"
+        android:icon="@drawable/baseline_bluetooth_searching_24"
         app:showAsAction="ifRoom"
         android:title="@string/secure_connect"/>
     <item
@@ -14,7 +14,6 @@
         android:id="@+id/select_default"
         app:showAsAction="never"
         android:title="@string/select_default"/>
-
     <item
         android:id="@+id/settings"
         app:showAsAction="never"
