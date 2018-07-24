@@ -16,6 +16,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.database.Cursor;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.BatteryManager;
 import android.os.Binder;
@@ -602,13 +603,13 @@ public class BluetoothChatService extends Service {
                     String readMessage = new String(buffer, 0, bytes);
                     String[] messageParts = readMessage.split(";", -1);
                     StringBuilder notificationText = new StringBuilder();
-                    for (int i=5; i<messageParts.length; i++) {
+                    for (int i=6; i<messageParts.length; i++) {
                         notificationText.append(messageParts[i]);
                         if (i + 1 < messageParts.length) {
                             notificationText.append(';');
                         }
                     }
-                    String[] textParts = new String[5];
+                    String[] textParts = new String[6];
                     int location = 0;
                     for (int i=0; i<textParts.length; i++) {
                         textParts[i] = notificationText.substring(location, location + Integer.parseInt(messageParts[i]));
@@ -619,12 +620,13 @@ public class BluetoothChatService extends Service {
                     String  titleText = textParts[2];
                     String bodyText = textParts[3];
                     String appName = textParts[4];
+                    String colorHex = '#' + textParts[5];
                     if (action == Type.Add) {
                         if (!Objects.equals(bodyText, "")) {
-                            showWindowsNotification(titleText, Integer.parseInt(id), bodyText, appName);
+                            showWindowsNotification(titleText, Integer.parseInt(id), bodyText, appName, colorHex);
                         }
                         else {
-                            showWindowsNotification(appName, Integer.parseInt(id), titleText, appName);
+                            showWindowsNotification(appName, Integer.parseInt(id), titleText, appName, colorHex);
                         }
                     } else if (action == Type.Remove) {
                         try {
@@ -834,28 +836,29 @@ public class BluetoothChatService extends Service {
     /**
      * Send a sample notification using the NotificationCompat API.
      */
-    public synchronized void showWindowsNotification(String title, int notificationId, String text, String appName) {
+    public synchronized void showWindowsNotification(String title, int notificationId, String text, String appName, String colorHex) {
         Notification.Builder builder;
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             builder = new Notification.Builder(this, Constants.WINDOWS_NOTIFICATIONS_CHANNEL_ID)
-                    .setColor(getColor(R.color.colorPrimaryDark));
+                    .setColor(Color.parseColor(colorHex)).setColorized(true);
         } else {
             builder = new Notification.Builder(this)
-                    .setPriority(Notification.PRIORITY_DEFAULT);
+                    .setPriority(Notification.PRIORITY_DEFAULT)
+                    .setLights(Color.parseColor(colorHex), 1000, 1000);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                builder.setColor(Color.parseColor(colorHex));
+            }
         }
 
         Intent intent = new Intent(Constants.NOTIFICATION_DELETED_ACTION);
         intent.putExtra("notificationId", notificationId);
         PendingIntent pendingIntent = PendingIntent.getBroadcast(this, notificationId, intent, 0);
         builder.setDeleteIntent(pendingIntent);
-        //builder.setStyle(new NotificationCompat.BigTextStyle().bigText(text));
 
         builder.setSmallIcon(R.drawable.ic_notification);
         builder.setContentTitle(title);
         builder.setContentText(text);
         builder.setSubText(appName);
-        //builder.setColor(ContextCompat.getColor(this, R.color.colorPrimary));
-        builder.setLights(WHITE, 1000, 1000);
         builder.setAutoCancel(true);
         notificationManager.notify(notificationId, builder.build());
     }
